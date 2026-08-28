@@ -1,54 +1,50 @@
-name: Inspect BoardVerse hotfix
+name: Verify BoardVerse hotfix
 on:
   push:
     branches: [hotfix/game-end-resign-v0.0.12]
   pull_request:
     branches: [main]
 jobs:
-  inspect:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build current worker
+      - name: Build v0.0.12 worker
         working-directory: BoardVerse
         run: |
           node build-worker.mjs
           node post-build-v009.mjs
           node post-build-v010.mjs
           node post-build-v011.mjs
+          node post-build-v012.mjs
           node --check worker.js
-      - name: Show exact end-condition source
+      - name: Verify terminal-state hotfix markers
         working-directory: BoardVerse
         run: |
           python3 - <<'PY'
           from pathlib import Path
+          import hashlib
           s=Path('worker.js').read_text()
-          anchors=[
-            'function applyGameAction',
-            'function applyGo',
-            'function applyGomoku',
-            'function applyRenju',
-            'function applyXiangqi',
-            'function applyChess',
-            'function applyReversi',
-            'resignBtn',
-            'confirmResign',
-            'match_end',
-            'resultBanner',
-          ]
-          for term in anchors:
-              print('\n===== ANCHOR',term,'=====')
-              start=0
-              count=0
-              while True:
-                  i=s.find(term,start)
-                  if i<0: break
-                  print('\n--- occurrence',count+1,'at',i,'---')
-                  print(s[max(0,i-1200):min(len(s),i+9000)])
-                  start=i+len(term)
-                  count+=1
-                  if count>=12: break
+          checks={
+            'version':'const APP_VERSION = "0.0.12";',
+            'full_board_draw':'if (next.board.every((cell) => cell != null))',
+            'draw_reason':'棋盤已滿且無勝線，和棋',
+            'seated_resign_guard':'auth.member.role !== "player" || !room.seats.includes(auth.member.id)',
+            'finish_idempotency':'if (!room || room.status !== "playing") return;',
+            'terminal_game_state':'if (room.game) { room.game.ended = true;',
+            'resign_ws':'send({type:\'resign\'})',
+            'go_pass':'send({type:\'pass\'})',
+            'server_resign':'if (msg.type === "resign") { await this.resign(token); return; }',
+          }
+          missing=[name for name,marker in checks.items() if marker not in s]
+          if missing:
+            raise SystemExit('missing markers: '+', '.join(missing))
+          if s.count('if (next.board.every((cell) => cell != null))') != 1:
+            raise SystemExit('full-board draw marker must be unique')
+          print('Verified:', ', '.join(checks))
+          print('worker bytes:', len(s.encode()))
+          print('worker sha256:', hashlib.sha256(s.encode()).hexdigest())
           PY
