@@ -20,23 +20,35 @@ jobs:
           node post-build-v010.mjs
           node post-build-v011.mjs
           node --check worker.js
-      - name: Show relevant source context
+      - name: Show exact end-condition source
         working-directory: BoardVerse
         run: |
           python3 - <<'PY'
           from pathlib import Path
           s=Path('worker.js').read_text()
-          terms=['webSocketMessage','forfeit','resign','finishGame','finished','gameOver','winner','applyMove','move','alarm()']
-          for term in terms:
-              print('\n===== TERM',term,'=====')
+          anchors=[
+            'function applyGameAction',
+            'function applyGo',
+            'function applyGomoku',
+            'function applyRenju',
+            'function applyXiangqi',
+            'function applyChess',
+            'function applyReversi',
+            'resignBtn',
+            'confirmResign',
+            'match_end',
+            'resultBanner',
+          ]
+          for term in anchors:
+              print('\n===== ANCHOR',term,'=====')
               start=0
               count=0
               while True:
                   i=s.find(term,start)
                   if i<0: break
                   print('\n--- occurrence',count+1,'at',i,'---')
-                  print(s[max(0,i-1800):min(len(s),i+3200)])
+                  print(s[max(0,i-1200):min(len(s),i+9000)])
                   start=i+len(term)
                   count+=1
-                  if count>=8: break
+                  if count>=12: break
           PY
