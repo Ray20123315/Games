@@ -26,14 +26,13 @@ jobs:
           node post-build-v018.mjs
           node post-build-v019.mjs
           node --check worker.js
-      - name: Print queue and rules contexts
+      - name: Print rule definitions
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import { readFile } from 'node:fs/promises';
           const s=await readFile('worker.js','utf8');
-          for(const needle of ['winner_stays','rotate_both','rotationRoom','queueEnabledRoom','SERVER_RULES','const RULES','renderGameCatalog','function renderGameCatalog','function openHelp','function fieldTranslation','function helpTranslation','function optionTranslation','function rotate','function advance','queue.shift','rematch','game-card{']){
-            let start=0,hit=0;
-            while(true){const i=s.indexOf(needle,start);if(i<0)break;hit++;console.log('\n### '+needle+' #'+hit+' @ '+i);console.log(s.slice(Math.max(0,i-1400),i+3600));start=i+needle.length;if(hit>=4)break;}
+          for(const needle of ['const RULE_DEFS','var RULE_OPTION_I18N','var RULE_HELP_I18N']){
+            const i=s.indexOf(needle);console.log('\n### '+needle+' @ '+i);if(i>=0)console.log(s.slice(i,i+16000));
           }
           NODE
