@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 
 const worker = new URL("./worker.js", import.meta.url);
 const sourceSha256 = "942e02299e7316f210bc3931fd6db855d3ee426aa3bf9020f05d6aa608c9651a";
+const expectedSha256 = "caec56b9b3642a057c6b2a3ef6b9d3db7a94dcac3e66359228bf515127131da8";
 const input = await readFile(worker);
 const actualSourceSha256 = createHash("sha256").update(input).digest("hex");
 if (actualSourceSha256 !== sourceSha256) throw new Error(`v0.0.21 worker SHA-256 mismatch: ${actualSourceSha256}`);
@@ -38,6 +39,7 @@ replaceExact(
 
 const out = Buffer.from(source, "utf8");
 const outputSha256 = createHash("sha256").update(out).digest("hex");
+if (outputSha256 !== expectedSha256) throw new Error(`v0.0.22 worker SHA-256 mismatch: ${outputSha256}`);
 if (!source.includes('const APP_VERSION = "0.0.22";')) throw new Error("v0.0.22 version patch missing");
 if (!source.includes("syncRuleControls(gameId,family,def,box)")) throw new Error("v0.0.22 rule control sync patch missing");
 if (source.includes("ruleDrafts[gameId].opening='none';renderRuleFields()")) throw new Error("stale rule-form rebuild handler remains");
