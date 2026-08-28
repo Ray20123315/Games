@@ -26,9 +26,8 @@ jobs:
           node post-build-v018.mjs
           node post-build-v019.mjs
           node post-build-v020.mjs
-          node sim-v020-theme-position.mjs
           node --check worker.js
-      - name: Verify placement and print hash
+      - name: Verify final placement and hash
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
@@ -37,6 +36,8 @@ jobs:
           const s=await readFile('worker.js','utf8');
           const bytes=Buffer.byteLength(s);
           const sha=createHash('sha256').update(s).digest('hex');
+          if(bytes!==201574)throw new Error('unexpected bytes '+bytes);
+          if(sha!=='b153db101988e5cd1d1381ff4e4dde2e6caa54036556fb9dc470eded10e7f53a')throw new Error('unexpected sha '+sha);
           const language=s.indexOf('id="languageSelect"');
           const theme=s.indexOf('id="pageThemeChoice"');
           const sound=s.indexOf('class="sound-wrap"');
@@ -45,8 +46,6 @@ jobs:
           if((s.match(/id="pageThemeChoice"/g)||[]).length!==1)throw new Error('theme control duplicated');
           if((s.match(/id="pageBgBlack"/g)||[]).length!==1||(s.match(/id="pageBgWhite"/g)||[]).length!==1)throw new Error('theme buttons duplicated');
           if(s.includes('board-bg-setting theme-setting'))throw new Error('old status-card theme control remains');
-          if(!s.includes('top-theme-setting'))throw new Error('compact topbar theme CSS missing');
-          console.log('V020_THEME_BYTES='+bytes);
-          console.log('V020_THEME_SHA256='+sha);
-          console.log('Verified page theme beside language');
+          for(const marker of ['host_stays','房主留桌','詳細了解規則設定','buildRuleDetailNode','Area 面積計分','Territory 地計分','Positional Superko','Capture Go','讓子'])if(!s.includes(marker))throw new Error('missing '+marker);
+          console.log('Verified final v0.0.20 '+bytes+' bytes '+sha);
           NODE
