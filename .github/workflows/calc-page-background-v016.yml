@@ -42,8 +42,15 @@ jobs:
             'page background controls'
           );
           replaceExact(
-            "function isBoardBgColor(v){return /^#[0-9a-f]{6}$/i.test(String(v||''))}\\nfunction boardBgShade(hex,amount){var n=parseInt(hex.slice(1),16),p=Math.max(-1,Math.min(1,amount)),t=p<0?0:255,q=Math.abs(p),r=n>>16,g=n>>8&255,b=n&255;function c(x){return Math.round((t-x)*q+x).toString(16).padStart(2,'0')}return '#'+c(r)+c(g)+c(b)}\\nfunction applyBoardBackground(value){var v=isBoardBgColor(value)?String(value).toLowerCase():'';document.body.classList.toggle('custom-board-bg',!!v);['--board-bg','--board-bg-light','--board-bg-dark'].forEach(function(k){document.documentElement.style.removeProperty(k)});if(v){document.documentElement.style.setProperty('--board-bg',v);document.documentElement.style.setProperty('--board-bg-light',boardBgShade(v,.24));document.documentElement.style.setProperty('--board-bg-dark',boardBgShade(v,-.2))}return v}\\nfunction refreshBoardBgLabels(){var label=lang==='en'?'Board background':lang==='zh-Hans'?'棋盘背景':'棋盤背景',reset=lang==='en'?'Default':lang==='zh-Hans'?'默认':'預設';$('boardBgLabel').textContent=label;$('boardBgColor').setAttribute('aria-label',label);$('boardBgReset').textContent=reset}\\n",
-            "function isPageBgColor(v){return /^#[0-9a-f]{6}$/i.test(String(v||''))}\\nfunction applyPageBackground(value){var v=isPageBgColor(value)?String(value).toLowerCase():'';document.body.classList.remove('custom-board-bg');['--board-bg','--board-bg-light','--board-bg-dark'].forEach(function(k){document.documentElement.style.removeProperty(k)});document.body.style.removeProperty('background');if(v)document.body.style.setProperty('background',v,'important');return v}\\nfunction refreshPageBgLabels(){var label=lang==='en'?'Page background':lang==='zh-Hans'?'页面背景':'頁面背景',reset=lang==='en'?'Default':lang==='zh-Hans'?'默认':'預設';$('pageBgLabel').textContent=label;$('pageBgColor').setAttribute('aria-label',label);$('pageBgReset').textContent=reset}\\n",
+            `function isBoardBgColor(v){return /^#[0-9a-f]{6}$/i.test(String(v||''))}
+function boardBgShade(hex,amount){var n=parseInt(hex.slice(1),16),p=Math.max(-1,Math.min(1,amount)),t=p<0?0:255,q=Math.abs(p),r=n>>16,g=n>>8&255,b=n&255;function c(x){return Math.round((t-x)*q+x).toString(16).padStart(2,'0')}return '#'+c(r)+c(g)+c(b)}
+function applyBoardBackground(value){var v=isBoardBgColor(value)?String(value).toLowerCase():'';document.body.classList.toggle('custom-board-bg',!!v);['--board-bg','--board-bg-light','--board-bg-dark'].forEach(function(k){document.documentElement.style.removeProperty(k)});if(v){document.documentElement.style.setProperty('--board-bg',v);document.documentElement.style.setProperty('--board-bg-light',boardBgShade(v,.24));document.documentElement.style.setProperty('--board-bg-dark',boardBgShade(v,-.2))}return v}
+function refreshBoardBgLabels(){var label=lang==='en'?'Board background':lang==='zh-Hans'?'棋盘背景':'棋盤背景',reset=lang==='en'?'Default':lang==='zh-Hans'?'默认':'預設';$('boardBgLabel').textContent=label;$('boardBgColor').setAttribute('aria-label',label);$('boardBgReset').textContent=reset}
+`,
+            `function isPageBgColor(v){return /^#[0-9a-f]{6}$/i.test(String(v||''))}
+function applyPageBackground(value){var v=isPageBgColor(value)?String(value).toLowerCase():'';document.body.classList.remove('custom-board-bg');['--board-bg','--board-bg-light','--board-bg-dark'].forEach(function(k){document.documentElement.style.removeProperty(k)});document.body.style.removeProperty('background');if(v)document.body.style.setProperty('background',v,'important');return v}
+function refreshPageBgLabels(){var label=lang==='en'?'Page background':lang==='zh-Hans'?'页面背景':'頁面背景',reset=lang==='en'?'Default':lang==='zh-Hans'?'默认':'預設';$('pageBgLabel').textContent=label;$('pageBgColor').setAttribute('aria-label',label);$('pageBgReset').textContent=reset}
+`,
             'page background helpers'
           );
           replaceExact(
@@ -54,6 +61,6 @@ jobs:
           const out=Buffer.from(source,'utf8');await writeFile('worker.js',out);
           console.log('V016_BYTES='+out.length);console.log('V016_SHA256='+createHash('sha256').update(out).digest('hex'));
           for(const marker of ['Page background','頁面背景','boardversePageBackground','applyPageBackground','document.body.style.setProperty(\'background\',v,\'important\')'])if(!source.includes(marker))throw new Error('missing '+marker);
-          for(const forbidden of ['body.custom-board-bg .line-board','boardBgShade(','boardverseBoardBackground\',v'])if(source.includes(forbidden))throw new Error('forbidden '+forbidden);
+          for(const forbidden of ['body.custom-board-bg .line-board','boardBgShade(','localStorage.setItem(\'boardverseBoardBackground\''])if(source.includes(forbidden))throw new Error('forbidden '+forbidden);
           NODE
           node --check worker.js
