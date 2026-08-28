@@ -35,11 +35,6 @@ replaceExact(
   "el.setAttribute('data-rule-key',f.key);el.disabled=false;el.removeAttribute('disabled');el.removeAttribute('aria-disabled');el.style.pointerEvents='auto';function saveDraft(){ruleDrafts[gameId][f.key]=ruleControlValue(f,el)}el.addEventListener('input',saveDraft);el.addEventListener('change',function(){saveDraft();if(family==='go'&&f.key==='ruleset'){var p={chinese:{scoring:'area',komi:7.5,koRule:'simple',suicide:false},japanese:{scoring:'territory',komi:6.5,koRule:'simple',suicide:false},aga:{scoring:'area',komi:7.5,koRule:'superko',suicide:false},newzealand:{scoring:'area',komi:7,koRule:'superko',suicide:true}}[String(ruleDrafts[gameId].ruleset)];if(p)Object.assign(ruleDrafts[gameId],p)}if(family==='gomoku'&&f.key==='variant'&&ruleDrafts[gameId].variant==='connect6')ruleDrafts[gameId].opening='none';syncRuleControls(gameId,family,def,box)});box.appendChild(row)",
   "do not rebuild rule form on change"
 );
-replaceExact(
-  "box.appendChild(row)})}",
-  "box.appendChild(row)});syncRuleControls(gameId,family,def,box)}",
-  "initial rule control sync"
-);
 
 const out = Buffer.from(source, "utf8");
 const outputSha256 = createHash("sha256").update(out).digest("hex");
