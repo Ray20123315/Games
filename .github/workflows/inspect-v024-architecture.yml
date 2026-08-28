@@ -29,13 +29,16 @@ jobs:
           node post-build-v021.mjs
           node post-build-v022.mjs
           node post-build-v023.mjs
-      - name: Inspect lobby record
+      - name: Inspect pass resign and finish handlers
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
           const s=await readFile('worker.js','utf8');
-          for(const m of ['  lobbyRecord() {','function sanitizeLobbyRecord(','function publicLobbyRecord(','function makeLobbyRecord(']){const i=s.indexOf(m);console.log('\n### '+m+' @ '+i);if(i>=0)console.log(s.slice(i,Math.min(s.length,i+4500)))}
+          for(const term of ['msg.type === "pass"','msg.type === "resign"','type === "pass"','type === "resign"','finishMatch(','handlePass','handleResign']){
+            let at=0,n=0; while((at=s.indexOf(term,at))>=0&&n<5){console.log('\n### '+term+' @ '+at);console.log(s.slice(Math.max(0,at-1600),Math.min(s.length,at+5200)));at+=term.length;n++;}
+            if(!n)console.log('\n### '+term+' @ -1');
+          }
           NODE
       - name: Simulate v0.0.24
         working-directory: BoardVerse
