@@ -1,0 +1,531 @@
+   19 APP_VERSION :: const APP_VERSION = "0.0.23";
+   20 MAX_CHAT_TEXT :: const MAX_CHAT_TEXT = 300;
+   21 MAX_CHAT_HISTORY :: const MAX_CHAT_HISTORY = 100;
+   22 MAX_REPLAY_HISTORY :: const MAX_REPLAY_HISTORY = 12;
+   23 MAX_REPLAY_ACTIONS :: const MAX_REPLAY_ACTIONS = 1200;
+   24 ROOM_CODE_RE :: const ROOM_CODE_RE = /^[A-Z2-9]{6}$/;
+   25 MAX_TEXT :: const MAX_TEXT = 40;
+   26 MAX_WS_MESSAGE :: const MAX_WS_MESSAGE = 8 * 1024;
+   27 OFFLINE_FORFEIT_MS :: const OFFLINE_FORFEIT_MS = 60 * 1000;
+   28 LOBBY_NAME :: const LOBBY_NAME = "__BOARDVERSE_LOBBY__";
+   30 GAME_CATALOG :: const GAME_CATALOG = {
+   89 RULE_DEFS :: const RULE_DEFS = {
+  147 gameFamily :: function gameFamily(gameId) { return GAME_CATALOG[gameId]?.family || ""; }
+  148 clampNumber :: function clampNumber(v, min, max, fallback, step = null) {
+  149 n :: let n = Number(v);
+  155 normalizeRules :: function normalizeRules(gameId, input = {}) {
+  156 family :: const family = gameFamily(gameId);
+  157 def :: const def = RULE_DEFS[family];
+  158 src :: const src = input && typeof input === "object" ? input : {};
+  160 out :: const out = structuredClone(def.defaults);
+  163 presets :: const presets = {
+  195 ruleValueLabel :: function ruleValueLabel(family, fieldKey, value) {
+  196 field :: const field = RULE_DEFS[family]?.fields.find((f) => f.key === fieldKey);
+  197 hit :: const hit = field?.options?.find((o) => String(o[0]) === String(value));
+  202 rulesSummary :: function rulesSummary(gameId, rules) {
+  203 family :: const family = gameFamily(gameId), def = RULE_DEFS[family];
+  208 publicRuleDefs :: function publicRuleDefs(gameId) {
+  209 family :: const family = gameFamily(gameId), def = RULE_DEFS[family];
+  214 cleanText :: function cleanText(value, fallback = "玩家") {
+  215 s :: const s = String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, MAX_TEXT);
+  219 json :: function json(data, status = 200, extra = {}) {
+  230 fail :: function fail(message, status = 400, code = "bad_request") {
+  234 randomRoomCode :: function randomRoomCode() {
+  235 alphabet :: const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  236 bytes :: const bytes = crypto.getRandomValues(new Uint8Array(6));
+  237 out :: let out = "";
+  242 roomStub :: function roomStub(env, roomId) {
+  247 parseJsonRequest :: async function parseJsonRequest(request) {
+  248 type :: const type = request.headers.get("content-type") || "";
+  253 SERVICE_WORKER_JS :: const SERVICE_WORKER_JS = `self.addEventListener("notificationclick", event => {
+  255 url :: const url = event.notification?.data?.url || "/";
+  257 all :: const all = await clients.matchAll({ type: "window", includeUncontrolled: true });
+  268 normalizeNameKey :: function normalizeNameKey(value) {
+  272 cleanPlayerName :: function cleanPlayerName(value) {
+  273 s :: const s = String(value ?? "").replace(/[\u0000-\u001f\u007f]/g, "").normalize("NFKC").trim().slice(0, MAX_TEXT);
+  278 bytesToBase64 :: function bytesToBase64(bytes) {
+  279 binary :: let binary = "";
+  284 base64ToBytes :: function base64ToBytes(value) {
+  285 binary :: const binary = atob(String(value || ""));
+  286 bytes :: const bytes = new Uint8Array(binary.length);
+  291 deriveReturnPassword :: async function deriveReturnPassword(password, saltB64) {
+  292 key :: const key = await crypto.subtle.importKey(
+  299 bits :: const bits = await crypto.subtle.deriveBits({
+  308 makePasswordRecord :: async function makePasswordRecord(password) {
+  309 text :: const text = String(password ?? "");
+  312 saltBytes :: const saltBytes = crypto.getRandomValues(new Uint8Array(16));
+  313 passwordSalt :: const passwordSalt = bytesToBase64(saltBytes);
+  314 passwordHash :: const passwordHash = await deriveReturnPassword(text, passwordSalt);
+  318 verifyPasswordRecord :: async function verifyPasswordRecord(member, password) {
+  321 candidate :: const candidate = await deriveReturnPassword(password, member.passwordSalt);
+  332 defaultRoomSettings :: function defaultRoomSettings(input = {}) {
+  339 newMemberBase :: function newMemberBase(name, credentials, extra = {}) {
+  340 now :: const now = Date.now();
+  360 roomMemberById :: function roomMemberById(room, id) {
+  364 roomMemberByToken :: function roomMemberByToken(room, token) {
+  368 seatMember :: function seatMember(room, seatIndex) {
+  372 publicMember :: function publicMember(member) {
+  384 migrateRoomState :: function migrateRoomState(room) {
+  386 changed :: let changed = false;
+  388 members :: const members = [];
+  389 seats :: const seats = [null, null];
+  390 now :: const now = Date.now();
+  392 m :: const m = {
+  402 m :: const m = {
+  411 pendingIds :: const pendingIds = [];
+  413 m :: const m = {
+  436 normalized :: const normalized = defaultRoomSettings(room.settings);
+  447 owner :: const owner = room.members.find((m) => m.isOwner) || roomMemberById(room, room.seats[0]);
+  451 normalizedKey :: const normalizedKey = normalizeNameKey(member.name);
+  463 players :: const players = room.seats.map((id) => roomMemberById(room, id)).filter(Boolean).map((m) => ({ memberId:m.id, name:m.name, side:m.side }));
+  470 htmlResponse :: function htmlResponse() {
+  482 default :: export default {
+  484 url :: const url = new URL(request.url);
+  485 roomPath :: const roomPath = url.pathname.match(/^\/([A-Z2-9]{6})\/?$/);
+  503 body :: const body = await parseJsonRequest(request);
+  504 gameId :: const gameId = String(body.gameId || "");
+  506 playerName :: const playerName = cleanPlayerName(body.playerName);
+  507 roomName :: const roomName = cleanText(body.roomName, GAME_CATALOG[gameId].title + " 房間");
+  508 roomId :: const roomId = randomRoomCode();
+  509 stub :: const stub = roomStub(env, roomId);
+  510 created :: const created = await stub.fetch(new Request("https://boardverse.internal/init", {
+  519 data :: const data = await created.json();
+  530 infoMatch :: const infoMatch = url.pathname.match(/^\/api\/rooms\/([A-Z2-9]{6})\/info$/);
+  535 enterMatch :: const enterMatch = url.pathname.match(/^\/api\/rooms\/([A-Z2-9]{6})\/(?:enter|join)$/);
+  538 body :: const body = await parseJsonRequest(request);
+  539 role :: const role = url.pathname.endsWith("/join") ? "player" : (body.role === "spectator" ? "spectator" : "player");
+  540 target :: const target = new Request("https://boardverse.internal/enter", {
+  553 wsMatch :: const wsMatch = url.pathname.match(/^\/ws\/([A-Z2-9]{6})$/);
+  556 target :: const target = new URL("https://boardverse.internal/ws");
+  565 GameRoom :: export class GameRoom extends DurableObject {
+  578 value :: const value = await this.ctx.storage.get("room");
+  580 migrated :: const migrated = migrateRoomState(value);
+  597 room :: const room = this.room;
+  599 activeMatchSeq :: const activeMatchSeq = Number(room.matchSeq) || 0;
+  600 seated :: const seated = new Set(Array.isArray(room.seats) ? room.seats.filter(Boolean) : []);
+  602 eligible :: const eligible = room.status === "playing" && member.role === "player" && seated.has(member.id);
+  616 room :: const room = this.room;
+  617 deadlines :: const deadlines = room?.status === "playing"
+  620 next :: const next = deadlines.length ? Math.min(...deadlines) : null;
+  621 current :: const current = await this.ctx.storage.getAlarm();
+  638 url :: const url = new URL(request.url);
+  650 items :: const items = (await this.ctx.storage.get("lobbyRooms")) || {};
+  651 now :: const now = Date.now();
+  652 keep :: const keep = {};
+  654 r :: const r = sanitizeLobbyRecord(raw);
+  655 fresh :: const fresh = now - (r.updatedAt || r.createdAt || 0) < 24 * 60 * 60 * 1000;
+  659 visible :: const visible = Object.values(keep).sort((a, b) => {
+  660 priority :: const priority = (r) => r.status === "playing" ? 0 : 1;
+  667 body :: const body = sanitizeLobbyRecord(await request.json());
+  668 items :: const items = (await this.ctx.storage.get("lobbyRooms")) || {};
+  676 body :: const body = await request.json();
+  677 items :: const items = (await this.ctx.storage.get("lobbyRooms")) || {};
+  679 merged :: const merged = sanitizeLobbyRecord({ ...(items[body.id] || {}), ...body });
+  689 body :: const body = await request.json();
+  692 name :: const name = cleanPlayerName(body.playerName);
+  693 credentials :: const credentials = await makePasswordRecord(body.returnPassword || "");
+  694 owner :: const owner = newMemberBase(name, credentials, { role: "player", side: sideFor(body.gameId, 0), isOwner: true });
+  695 now :: const now = Date.now();
+  696 rules :: const rules = normalizeRules(body.gameId, body.rules);
+  728 room :: const room = await this.loadRoom();
+  730 playerCount :: const playerCount = room.seats.filter(Boolean).length;
+  741 room :: const room = await this.loadRoom();
+  743 body :: const body = await request.json();
+  744 playerName :: const playerName = cleanPlayerName(body.playerName);
+  745 nameKey :: const nameKey = normalizeNameKey(playerName);
+  746 password :: const password = String(body.returnPassword || "");
+  747 desiredRole :: const desiredRole = body.role === "spectator" ? "spectator" : "player";
+  748 sessionToken :: const sessionToken = String(body.sessionToken || "");
+  749 existing :: const existing = room.members.find((m) => m.nameKey === nameKey);
+  751 allowed :: let allowed = sessionToken && sessionToken === existing.token;
+  755 oldToken :: const oldToken = existing.token;
+  766 credentials :: const credentials = await makePasswordRecord(password);
+  767 member :: const member = newMemberBase(playerName, credentials, { role: desiredRole === "spectator" ? "spectator" : "pending" });
+  773 openSeat :: const openSeat = room.seats.findIndex((id) => !id);
+  806 member :: const member = roomMemberByToken(this.room, token);
+  811 room :: const room = this.room;
+  822 idx :: const idx = this.room.seats.indexOf(member.id);
+  830 room :: const room = this.room;
+  831 players :: const players = room.seats.map((id) => roomMemberById(room, id)).filter(Boolean).map((m) => ({ memberId:m.id, name:m.name, side:m.side }));
+  840 replay :: const replay = this.room?.currentReplay;
+  855 room :: const room = this.room;
+  857 replay :: const replay = room.currentReplay;
+  866 room :: const room = this.room;
+  868 a :: const a = seatMember(room, 0), b = seatMember(room, 1);
+  885 room :: const room = await this.loadRoom();
+  887 token :: const token = url.searchParams.get("token") || "";
+  888 auth :: const auth = this.authToken(token);
+  890 pair :: const pair = new WebSocketPair();
+  908 token :: const token = (ws.deserializeAttachment() || {}).token || "";
+  911 auth :: const auth = this.authToken(token);
+  930 room :: const room = this.room;
+  931 auth :: const auth = this.authToken(token);
+  935 a :: const a = seatMember(room, 0), b = seatMember(room, 1);
+  936 tmp :: const tmp = a.side; a.side = b.side; b.side = tmp; room.game.swapAvailable = false;
+  942 room :: const room = this.room;
+  943 auth :: const auth = this.authToken(token);
+  945 clean :: const clean = String(text ?? "").replace(/[\u0000-\u001f\u007f]/g, "").trim().slice(0, MAX_CHAT_TEXT);
+  947 channel :: const channel = auth.member.role === "player" ? "playerChat" : "spectatorChat";
+  949 entry :: const entry = { id: room.chatSeq, memberId: auth.member.id, name: auth.member.name, role: auth.member.role, side: auth.member.side || null, text: clean, at: Date.now() };
+  956 room :: const room = this.room;
+  957 auth :: const auth = this.authToken(token);
+  960 result :: const result = applyGameAction(room.game, auth.member.side, msg);
+  971 room :: const room = this.room;
+  972 auth :: const auth = this.authToken(token);
+  974 member :: const member = roomMemberById(room, requestId);
+  978 oldToken :: const oldToken = member.token;
+  982 openSeat :: const openSeat = room.seats.findIndex((id) => !id);
+  986 oldToken :: const oldToken = member.token;
+  995 auth :: const auth = this.authToken(token);
+  997 room :: const room = this.room;
+  998 i :: const i = room.queue.indexOf(String(memberId || ""));
+ 1000 delta :: const delta = direction === "down" ? 1 : -1;
+ 1001 j :: const j = i + delta;
+ 1008 auth :: const auth = this.authToken(token);
+ 1010 room :: const room = this.room;
+ 1015 member :: const member = roomMemberById(room, id);
+ 1023 room :: const room = this.room;
+ 1024 auth :: const auth = this.authToken(token);
+ 1027 opponent :: const opponent = room.seats.map((id) => roomMemberById(room, id)).find((m) => m && m.id !== auth.member.id);
+ 1032 room :: const room = this.room;
+ 1034 publicResult :: const publicResult = this.publicResult(result);
+ 1036 loser :: const loser = publicResult.winner ? room.seats.map((id) => roomMemberById(room, id)).find((m) => m && m.side !== publicResult.winner) : null;
+ 1047 winner :: const winner = result?.winner || null;
+ 1048 winnerMember :: const winnerMember = winner ? this.room.seats.map((id) => roomMemberById(this.room, id)).find((m) => m?.side === winner) : null;
+ 1053 room :: const room = this.room;
+ 1054 seated :: const seated = room.seats.map((id) => roomMemberById(room, id));
+ 1055 winner :: const winner = result?.winner ? seated.find((m) => m?.side === result.winner) : null;
+ 1056 hostStays :: const hostStays = room.settings.rotationPolicy === "host_stays";
+ 1057 rotateBoth :: const rotateBoth = !hostStays && (room.settings.rotationPolicy === "rotate_both" || !winner);
+ 1063 id :: const id = room.queue.shift();
+ 1064 member :: const member = roomMemberById(room, id);
+ 1066 seatIndex :: const seatIndex = room.seats.findIndex((seat) => !seat);
+ 1078 room :: const room = this.room;
+ 1081 auth :: const auth = this.authToken(token);
+ 1090 token :: const token = (ws.deserializeAttachment() || {}).token || "";
+ 1092 member :: const member = roomMemberByToken(this.room, token);
+ 1101 token :: const token = (ws.deserializeAttachment() || {}).token || "";
+ 1103 member :: const member = roomMemberByToken(this.room, token);
+ 1110 room :: const room = await this.loadRoom();
+ 1117 now :: const now = Date.now();
+ 1118 overdue :: const overdue = room.seats
+ 1123 loser :: const loser = overdue[0];
+ 1130 opponent :: const opponent = room.seats.map((id) => roomMemberById(room, id)).find((m) => m && m.id !== loser.id);
+ 1135 room :: const room = this.room;
+ 1136 auth :: const auth = this.authToken(token);
+ 1138 id :: const id = String(replayId || "");
+ 1139 replay :: const replay = room.replays.find((x) => String(x.id) === id);
+ 1141 built :: const built = buildReplay(replay);
+ 1168 token :: const token = (ws.deserializeAttachment() || {}).token || "";
+ 1175 r :: const r = this.room;
+ 1194 sanitizeLobbyRecord :: function sanitizeLobbyRecord(r) {
+ 1205 roomView :: function roomView(room, token) {
+ 1207 member :: const member = roomMemberByToken(room, token);
+ 1208 role :: const role = member ? (member.role === "player" ? (member.isOwner ? "host" : "guest") : member.role) : "unknown";
+ 1209 playerA :: const playerA = seatMember(room, 0), playerB = seatMember(room, 1);
+ 1210 isOwner :: const isOwner = !!member && member.id === room.ownerId;
+ 1211 chat :: const chat = member?.role === "player" ? room.playerChat : (["spectator", "queued"].includes(member?.role) ? room.spectatorChat : []);
+ 1231 resultSummary :: function resultSummary(room, token) {
+ 1233 result :: const result = room.result;
+ 1234 winnerSide :: const winnerSide = result.winner || null;
+ 1235 mine :: const mine = roomMemberByToken(room, token);
+ 1236 winnerName :: const winnerName = result.winnerName || (winnerSide ? room.members.find((m) => m.id === result.winnerMemberId)?.name : null) || null;
+ 1237 loserName :: const loserName = result.loserName || (result.loserMemberId ? room.members.find((m) => m.id === result.loserMemberId)?.name : null) || null;
+ 1238 outcome :: let outcome = "draw";
+ 1248 sanitizeReplayMove :: function sanitizeReplayMove(msg) {
+ 1249 out :: const out = {};
+ 1256 replaySummary :: function replaySummary(replay) {
+ 1266 buildReplay :: function buildReplay(replay) {
+ 1267 game :: let game = structuredClone(replay?.initialGame || newGame(replay?.gameId, replay?.rules || {}));
+ 1268 frames :: const frames = [{ index:0, label:"開始", at:replay?.startedAt||0, game:publicGameState(game) }];
+ 1269 error :: let error = null;
+ 1275 applied :: const applied = applyGameAction(game, action.side, action.move || {});
+ 1287 sideFor :: function sideFor(gameId, seat) {
+ 1293 newGame :: function newGame(gameId, rulesInput = {}) {
+ 1294 rules :: const rules = normalizeRules(gameId, rulesInput);
+ 1296 size :: const size = Number(gameId.slice(2));
+ 1297 board :: const board = Array(size * size).fill(null);
+ 1298 handicapPoints :: const handicapPoints = goHandicapPoints(size, rules.handicap);
+ 1300 firstTurn :: const firstTurn = handicapPoints.length >= 2 ? "W" : "B";
+ 1301 initialHash :: const initialHash = boardHash(board);
+ 1305 size :: const size = rules.boardSize;
+ 1309 size :: const size = 15;
+ 1318 goHandicapPoints :: function goHandicapPoints(size, handicap) {
+ 1319 h :: const h = Math.max(0, Math.min(9, Number(handicap)||0));
+ 1321 low :: const low = size === 9 ? 2 : 3, high = size - 1 - low, mid = Math.floor(size/2);
+ 1322 seq :: const seq = [[low,high],[high,low],[high,high],[low,low],[mid,mid],[mid,low],[mid,high],[low,mid],[high,mid]];
+ 1323 order :: const order = h === 5 ? [0,1,2,3,4] : h === 6 ? [0,1,2,3,5,6] : h === 7 ? [0,1,2,3,5,6,4] : h === 8 ? [0,1,2,3,5,6,7,8] : h === 9 ? [0,1,2,3,5,6,7,8,4] : Array.from({length:h},(_,i
+ 1327 publicGameState :: function publicGameState(game) {
+ 1328 out :: const out = structuredClone(game);
+ 1330 rules :: const rules = out.rules || {};
+ 1337 applyGameAction :: function applyGameAction(game, side, msg) {
+ 1346 rcToIndex :: function rcToIndex(r, c, size) { return r * size + c; }
+ 1347 inBoard :: function inBoard(r, c, rows, cols = rows) { return r >= 0 && c >= 0 && r < rows && c < cols; }
+ 1348 opponent :: function opponent(side) { return side === "B" ? "W" : "B"; }
+ 1351 applyGo :: function applyGo(game, side, msg) {
+ 1354 next :: const next = structuredClone(game);
+ 1355 oldHash :: const oldHash = boardHash(game.board);
+ 1356 rules :: const rules = game.rules || normalizeRules("go" + game.size, {});
+ 1366 winner :: const winner = next.score.B === next.score.W ? null : (next.score.B > next.score.W ? "B" : "W");
+ 1371 r :: const r = Number(msg.r), c = Number(msg.c);
+ 1373 idx :: const idx = rcToIndex(r, c, next.size);
+ 1376 enemy :: const enemy = opponent(side);
+ 1377 captured :: let captured = 0;
+ 1379 nidx :: const nidx = rcToIndex(nr, nc, next.size);
+ 1381 group :: const group = goGroup(next.board, next.size, nr, nc);
+ 1387 ownGroup :: let ownGroup = goGroup(next.board, next.size, r, c);
+ 1392 newHash :: const newHash = boardHash(next.board);
+ 1410 orthNeighbors :: function orthNeighbors(r, c, rows, cols) {
+ 1411 out :: const out = [];
+ 1413 nr :: const nr = r + dr, nc = c + dc;
+ 1419 goGroup :: function goGroup(board, size, sr, sc) {
+ 1420 color :: const color = board[rcToIndex(sr, sc, size)];
+ 1421 stack :: const stack = [[sr, sc]];
+ 1422 seen :: const seen = new Set();
+ 1423 stones :: const stones = [];
+ 1424 liberties :: const liberties = new Set();
+ 1427 idx :: const idx = rcToIndex(r, c, size);
+ 1432 nidx :: const nidx = rcToIndex(nr, nc, size);
+ 1440 boardHash :: function boardHash(board) { return board.map((x) => x || ".").join(""); }
+ 1442 scoreGo :: function scoreGo(game) {
+ 1443 rules :: const rules = game.rules || {scoring:"area"};
+ 1444 B :: let B = rules.scoring === "territory" ? (game.captures?.B || 0) : 0;
+ 1445 W :: let W = (rules.scoring === "territory" ? (game.captures?.W || 0) : 0) + game.komi;
+ 1446 visited :: const visited = new Set();
+ 1451 region :: const region = [];
+ 1452 borders :: const borders = new Set();
+ 1453 stack :: const stack = [i];
+ 1455 cur :: const cur = stack.pop();
+ 1459 r :: const r = Math.floor(cur / game.size), c = cur % game.size;
+ 1461 ni :: const ni = rcToIndex(nr, nc, game.size);
+ 1462 v :: const v = game.board[ni];
+ 1476 LINE_DIRS :: const LINE_DIRS = [[1,0],[0,1],[1,1],[1,-1]];
+ 1478 applyGomoku :: function applyGomoku(game, side, msg) {
+ 1481 r :: const r = Number(msg.r), c = Number(msg.c);
+ 1483 idx :: const idx = rcToIndex(r, c, game.size);
+ 1485 next :: const next = structuredClone(game);
+ 1486 rules :: const rules = next.rules || {};
+ 1487 center :: const center = Math.floor(game.size / 2);
+ 1495 lengths :: const lengths = LINE_DIRS.map(([dr, dc]) => contiguousLength(next.board, next.size, r, c, dr, dc, side));
+ 1501 fours :: const fours = countRenjuFourDirections(next.board, next.size, r, c);
+ 1503 threes :: const threes = countRenjuOpenThreeDirections(next.board, next.size, r, c);
+ 1507 target :: const target = game.type === "gomoku" && rules.variant === "connect6" ? 6 : 5;
+ 1508 wins :: const wins = LINE_DIRS.some(([dr, dc]) => {
+ 1509 n :: const n = contiguousLength(next.board, next.size, r, c, dr, dc, side);
+ 1533 contiguousLength :: function contiguousLength(board, size, r, c, dr, dc, side) {
+ 1534 n :: let n = 1;
+ 1536 rr :: const rr = r + dr * k, cc = c + dc * k;
+ 1541 rr :: const rr = r - dr * k, cc = c - dc * k;
+ 1548 countRenjuFourDirections :: function countRenjuFourDirections(board, size, r, c) {
+ 1549 count :: let count = 0;
+ 1551 wins :: let wins = 0;
+ 1553 rr :: const rr = r + dr * t, cc = c + dc * t;
+ 1555 i :: const i = rcToIndex(rr, cc, size);
+ 1558 len :: const len = contiguousLength(board, size, rr, cc, dr, dc, "B");
+ 1567 countRenjuOpenThreeDirections :: function countRenjuOpenThreeDirections(board, size, r, c) {
+ 1568 count :: let count = 0;
+ 1570 createsOpenFour :: let createsOpenFour = false;
+ 1572 rr :: const rr = r + dr * t, cc = c + dc * t;
+ 1574 i :: const i = rcToIndex(rr, cc, size);
+ 1577 lineLen :: const lineLen = contiguousLength(board, size, rr, cc, dr, dc, "B");
+ 1579 winPoints :: let winPoints = 0;
+ 1581 ar :: const ar = r + dr * u, ac = c + dc * u;
+ 1583 ai :: const ai = rcToIndex(ar, ac, size);
+ 1586 len :: const len = contiguousLength(board, size, ar, ac, dr, dc, "B");
+ 1600 newXiangqi :: function newXiangqi(rules = normalizeRules("xiangqi", {})) {
+ 1601 b :: const b = Array(90).fill(null);
+ 1602 put :: const put = (r, c, p) => b[r * 9 + c] = p;
+ 1603 back :: const back = ["R","H","E","A","K","A","E","H","R"];
+ 1610 applyXiangqi :: function applyXiangqi(game, side, msg) {
+ 1613 from :: const from = Number(msg.from), to = Number(msg.to);
+ 1615 color :: const color = side === "R" ? "r" : "b";
+ 1616 sim :: const sim = simulateXiangqiMove(game.board, color, from, to);
+ 1618 next :: const next = structuredClone(game);
+ 1622 enemyColor :: const enemyColor = color === "r" ? "b" : "r";
+ 1623 enemySide :: const enemySide = side === "R" ? "B" : "R";
+ 1630 checked :: const checked = isXiangqiInCheck(next.board, enemyColor);
+ 1638 simulateXiangqiMove :: function simulateXiangqiMove(board, color, from, to) {
+ 1639 piece :: const piece = board[from];
+ 1643 b :: const b = board.slice();
+ 1649 xiangqiPseudoLegal :: function xiangqiPseudoLegal(board, from, to) {
+ 1650 p :: const p = board[from]; if (!p) return false;
+ 1651 color :: const color = p[0], type = p[1];
+ 1652 fr :: const fr = Math.floor(from / 9), fc = from % 9, tr = Math.floor(to / 9), tc = to % 9;
+ 1653 dr :: const dr = tr - fr, dc = tc - fc, adr = Math.abs(dr), adc = Math.abs(dc);
+ 1660 screens :: const screens = countBetween(board, fr, fc, tr, tc, 9);
+ 1665 legR :: const legR = fr + (adr === 2 ? Math.sign(dr) : 0);
+ 1666 legC :: const legC = fc + (adc === 2 ? Math.sign(dc) : 0);
+ 1679 target :: const target = board[to];
+ 1696 countBetween :: function countBetween(board, fr, fc, tr, tc, cols) {
+ 1697 dr :: const dr = tr - fr, dc = tc - fc;
+ 1699 count :: let count = 0;
+ 1700 sr :: const sr = Math.sign(dr), sc = Math.sign(dc);
+ 1701 r :: let r = fr + sr, c = fc + sc;
+ 1709 findXiangqiKing :: function findXiangqiKing(board, color) { return board.findIndex((p) => p === color + "K"); }
+ 1710 isXiangqiInCheck :: function isXiangqiInCheck(board, color) {
+ 1711 king :: const king = findXiangqiKing(board, color);
+ 1713 enemy :: const enemy = color === "r" ? "b" : "r";
+ 1720 hasAnyXiangqiLegalMove :: function hasAnyXiangqiLegalMove(board, color) {
+ 1729 newChess :: function newChess(rules = normalizeRules("chess", {})) {
+ 1730 b :: const b = Array(64).fill(null);
+ 1731 back :: const back = ["R","N","B","Q","K","B","N","R"];
+ 1736 applyChess :: function applyChess(game, side, msg) {
+ 1739 from :: const from = Number(msg.from), to = Number(msg.to);
+ 1741 color :: const color = side === "W" ? "w" : "b";
+ 1742 next :: const next = simulateChessMove(game, color, from, to, msg.promotion);
+ 1747 enemyColor :: const enemyColor = color === "w" ? "b" : "w";
+ 1748 enemySide :: const enemySide = side === "W" ? "B" : "W";
+ 1749 rules :: const rules = next.rules || normalizeRules("chess", {});
+ 1750 movedPiece :: const movedPiece = game.board[from], capturedPiece = game.board[to];
+ 1754 posKey :: const posKey = chessPositionKey(next);
+ 1771 chessPositionKey :: function chessPositionKey(game) {
+ 1774 repetitionCount :: function repetitionCount(history, key) { let n=0; for (const x of history || []) if (x===key) n++; return n; }
+ 1775 isInsufficientMaterial :: function isInsufficientMaterial(board) {
+ 1776 pieces :: const pieces = board.map((p,i)=>p?{p,i}:null).filter(Boolean).filter((x)=>x.p[1]!=="K");
+ 1780 colors :: const colors = new Set(pieces.map((x)=>((Math.floor(x.i/8)+x.i%8)&1)));
+ 1786 simulateChessMove :: function simulateChessMove(game, color, from, to, promotion) {
+ 1787 board :: const board = game.board;
+ 1788 piece :: const piece = board[from];
+ 1790 type :: const type = piece[1];
+ 1791 fr :: const fr = Math.floor(from / 8), fc = from % 8, tr = Math.floor(to / 8), tc = to % 8;
+ 1792 dr :: const dr = tr - fr, dc = tc - fc, adr = Math.abs(dr), adc = Math.abs(dc);
+ 1793 b :: const b = board.slice();
+ 1794 castling :: const castling = { ...game.castling };
+ 1795 enPassant :: let enPassant = null;
+ 1796 legal :: let legal = false;
+ 1799 dir :: const dir = color === "w" ? -1 : 1;
+ 1800 startRow :: const startRow = color === "w" ? 6 : 1;
+ 1805 victim :: const victim = fr * 8 + tc;
+ 1815 kingStart :: const kingStart = color === "w" ? 60 : 4;
+ 1817 kingside :: const kingside = dc === 2;
+ 1818 right :: const right = color + (kingside ? "K" : "Q");
+ 1820 rookFrom :: const rookFrom = color === "w" ? (kingside ? 63 : 56) : (kingside ? 7 : 0);
+ 1821 rookTo :: const rookTo = color === "w" ? (kingside ? 61 : 59) : (kingside ? 5 : 3);
+ 1823 betweenCols :: const betweenCols = kingside ? [5,6] : [1,2,3];
+ 1825 transit :: const transit = fr * 8 + (fc + Math.sign(dc));
+ 1833 captured :: const captured = board[to];
+ 1836 choice :: const choice = String(promotion || "Q").toUpperCase();
+ 1847 revokeRookCastling :: function revokeRookCastling(castling, color, square) {
+ 1854 isChessInCheck :: function isChessInCheck(board, color) {
+ 1855 king :: const king = board.findIndex((p) => p === color + "K");
+ 1860 isSquareAttacked :: function isSquareAttacked(board, target, byColor) {
+ 1861 tr :: const tr = Math.floor(target / 8), tc = target % 8;
+ 1863 p :: const p = board[from];
+ 1865 fr :: const fr = Math.floor(from / 8), fc = from % 8;
+ 1866 dr :: const dr = tr - fr, dc = tc - fc, adr = Math.abs(dr), adc = Math.abs(dc);
+ 1868 dir :: const dir = byColor === "w" ? -1 : 1;
+ 1879 hasAnyChessLegalMove :: function hasAnyChessLegalMove(game, color) {
+ 1888 newReversi :: function newReversi(rules = normalizeRules("reversi", {})) {
+ 1889 size :: const size = rules.boardSize || 8, b = Array(size * size).fill(null), m = size / 2;
+ 1893 applyReversi :: function applyReversi(game, side, msg) {
+ 1896 size :: const size=game.size, r=Number(msg.r), c=Number(msg.c);
+ 1898 flips :: const flips=reversiFlips(game.board,side,r,c,size);
+ 1900 next :: const next=structuredClone(game), idx=r*size+c; next.board[idx]=side; for(const f of flips) next.board[f]=side;
+ 1904 winner :: let winner=null; if(B!==W){ const normal=(next.rules?.objective||"normal")==="normal"; winner=normal?(B>W?"B":"W"):(B<W?"B":"W"); }
+ 1909 reversiFlips :: function reversiFlips(board,side,r,c,size) {
+ 1914 hasReversiMove :: function hasReversiMove(board,side,size) { for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(reversiFlips(board,side,r,c,size).length)return true;return false; }
+ 1916 APP_HTML :: const APP_HTML = String.raw`<!doctype html>
+ 2002 SERVER_GAMES :: var SERVER_GAMES=__CLIENT_GAMES__;
+ 2003 SERVER_RULES :: var SERVER_RULES=__CLIENT_RULE_DEFS__;
+ 2004 GAMES :: var GAMES={
+ 2014 I18N :: var I18N={
+ 2019 HELP :: var HELP={
+ 2026 RULE_OPTION_I18N :: var RULE_OPTION_I18N={
+ 2041 RULE_HELP_I18N :: var RULE_HELP_I18N={
+ 2062 langIndex :: function langIndex(){return lang==="en"?2:lang==="zh-Hans"?1:0}
+ 2063 optionTranslation :: function optionTranslation(family,key,value,fallback){var hit=RULE_OPTION_I18N[family]&&RULE_OPTION_I18N[family][key]&&RULE_OPTION_I18N[family][key][String(value)];return hit?hit[l
+ 2064 ruleHelpText :: function ruleHelpText(family,key,fallback){var hit=RULE_HELP_I18N[family+"."+key];return hit?hit[langIndex()]:(lang==="zh-Hans"?String(fallback||"").replace(/規則/g,"规则").replace(/棋盤
+ 2065 ruleValueText :: function ruleValueText(family,field,value){if(field&&field.options){var found=field.options.find(function(o){return String(o[0])===String(value)});if(found)return optionTranslation
+ 2066 localizedRulesSummary :: function localizedRulesSummary(gameId,rules,defs){var family=defs&&defs.family||(SERVER_GAMES[gameId]&&SERVER_GAMES[gameId].family)||'';var fields=defs&&defs.fields||(SERVER_RULES[
+ 2067 lang :: var lang=localStorage.getItem("boardverseLang")||"zh-Hant";if(!["zh-Hant","zh-Hans","en"].includes(lang))lang="zh-Hant";
+ 2068 session :: var session=null,ws=null,roomState=null,selected=null,lastChatId=0,lastMoveKey="",gateCode="",gateInfo=null,modalConfirmAction=null,audioCtx=null,swReg=null,replayData=null,replayI
+ 2070 $ :: function $(id){return document.getElementById(id)}
+ 2071 normalizePageTheme :: function normalizePageTheme(v){v=String(v||'').toLowerCase();if(v==='white'||v==='#fff'||v==='#ffffff')return 'white';if(v==='black'||v==='#000'||v==='#000000')return 'black';if(/^
+ 2072 applyPageTheme :: function applyPageTheme(value){var v=normalizePageTheme(value);document.body.classList.remove('custom-board-bg','page-theme-black','page-theme-white');['--board-bg','--board-bg-lig
+ 2073 refreshPageBgLabels :: function refreshPageBgLabels(){var label=lang==='en'?'Page background':lang==='zh-Hans'?'页面背景':'頁面背景',black=lang==='en'?'Black':lang==='zh-Hans'?'黑':'黑',white=lang==='en'?'White':l
+ 2074 localeKey :: function localeKey(){return lang==="zh-Hant"?"zhHant":lang==="zh-Hans"?"zhHans":"en"}
+ 2075 t :: function t(key){var dict=I18N[localeKey()]||I18N.zhHant;return dict[key]||I18N.zhHant[key]||key}
+ 2076 gameText :: function gameText(id,index){var key=lang==="zh-Hans"?"zhHans":lang==="en"?"en":"zhHant";return GAMES[id]&&GAMES[id][key]?GAMES[id][key][index||0]:(SERVER_GAMES[id]?SERVER_GAMES[id]
+ 2077 queuePolicyText :: function queuePolicyText(v){if(v==='host_stays')return lang==='en'?'Host stays':lang==='zh-Hans'?'房主留桌':'房主留桌';return v}
+ 2078 refreshQueuePolicyLabels :: function refreshQueuePolicyLabels(){document.querySelectorAll('option[value="host_stays"]').forEach(function(o){o.textContent=queuePolicyText('host_stays')})}
+ 2079 ruleDetailsLabel :: function ruleDetailsLabel(){return lang==='en'?'Learn rule settings':lang==='zh-Hans'?'详细了解规则设置':'詳細了解規則設定'}
+ 2080 applyLanguage :: function applyLanguage(){document.documentElement.lang=lang==="zh-Hans"?"zh-Hans-CN":lang==="en"?"en":"zh-Hant-TW";$('languageSelect').value=lang;document.querySelectorAll('[data-i
+ 2081 setNotice :: function setNotice(text,bad){$('notice').textContent=text||'';$('notice').className='notice'+(bad?' err':'')}
+ 2082 setGateNotice :: function setGateNotice(text,bad){$('gateNotice').textContent=text||'';$('gateNotice').className='notice'+(bad?' err':'')}
+ 2083 setRoomNotice :: function setRoomNotice(text,bad){$('roomNotice').textContent=text||'';$('roomNotice').className='room-notice'+(bad?' err':'')}
+ 2084 toast :: function toast(text,kind){var el=document.createElement('div');el.className='toast'+(kind?' '+kind:'');el.textContent=text;$('toastStack').appendChild(el);setTimeout(function(){el.
+ 2085 openModal :: function openModal(title,body,options){options=options||{};$('modalTitle').textContent=title;$('modalBody').textContent='';if(options.node)$('modalBody').appendChild(options.node);
+ 2086 closeModal :: function closeModal(){$('modalOverlay').classList.add('hidden');modalConfirmAction=null}
+ 2087 openHelp :: function openHelp(target,title,body){$('helpTitle').textContent=title;$('helpBody').textContent=body;var pop=$('helpPopover');pop.classList.remove('hidden');var r=target.getBoundin
+ 2088 closeHelp :: function closeHelp(){$('helpPopover').classList.add('hidden')}
+ 2089 api :: function api(path,opt){return fetch(path,opt).then(function(r){return r.json().catch(function(){return {message:'Invalid response'}}).then(function(d){if(!r.ok){var e=new Error(d.m
+ 2090 statusText :: function statusText(s){return s==='waiting'?t('waiting'):s==='playing'?t('playing'):t('finished')}
+ 2091 sideName :: function sideName(gameId,s){if(gameId==='chess')return s==='W'?(lang==='en'?'White':lang==='zh-Hans'?'白方':'白方'):(lang==='en'?'Black':'黑方');if(gameId==='xiangqi')return s==='R'?(lan
+ 2092 roomPath :: function roomPath(code){return '/'+String(code||'').toUpperCase()}
+ 2093 PUBLIC_ROOM_ORIGIN :: var PUBLIC_ROOM_ORIGIN='https://xn--gmqt6w03b11v.ray2025.com';
+ 2094 roomUrl :: function roomUrl(code){return PUBLIC_ROOM_ORIGIN+roomPath(code)}
+ 2095 pathCode :: function pathCode(){var m=location.pathname.match(/^\/([A-Z2-9]{6})\/?$/);return m?m[1]:''}
+ 2096 showView :: function showView(which){['lobby','roomGate','room'].forEach(function(id){$(id).classList.toggle('hidden',id!==which)});document.body.classList.toggle('room-mode',which==='room')}
+ 2097 saveSession :: function saveSession(d,name){session={roomId:d.roomId,token:d.token,role:d.role,name:name||'',memberId:d.memberId||null};localStorage.setItem('boardverseSession',JSON.stringify(ses
+ 2098 leave :: function leave(){session=null;roomState=null;selected=null;lastChatId=0;lastMoveKey='';localStorage.removeItem('boardverseSession');if(ws){try{ws.close()}catch(e){}ws=null}history.
+ 2099 cleanCode :: function cleanCode(v){return String(v||'').toUpperCase().replace(/[^A-Z2-9]/g,'').slice(0,6)}
+ 2100 ruleDrafts :: var ruleDrafts=window.__boardverseRuleDrafts||(window.__boardverseRuleDrafts={});
+ 2101 ruleControlValue :: function ruleControlValue(f,el){if(f.type==='checkbox')return !!el.checked;if(f.type==='number')return Number(el.value);return el.value}
+ 2102 formRules :: function formRules(){var gameId=$('gameId').value,family=SERVER_GAMES[gameId].family,def=SERVER_RULES[family],out={};if(!def)return out;def.fields.forEach(function(f){var el=docume
+ 2103 fieldTranslation :: function fieldTranslation(family,key,kind,fallback){var map={
+ 2110 helpTranslation :: function helpTranslation(family,key,fallback){return ruleHelpText(family,key,fallback)}
+ 2111 goOptionDetail :: function goOptionDetail(key,value){var z=lang==='en'?2:lang==='zh-Hans'?1:0,m={ruleset:{chinese:['BoardVerse 預設：Area 面積計分、Komi 7.5、Simple Ko、禁止自殺著。','BoardVerse 默认：Area 面积计分、Komi 7
+ 2112 buildRuleDetailNode :: function buildRuleDetailNode(gameId){var wrap=document.createElement('div');wrap.className='rule-detail-list';var game=SERVER_GAMES[gameId],family=game&&game.family,def=family&&SER
+ 2113 openGameRuleDetails :: function openGameRuleDetails(gameId){openModal(gameText(gameId,0)+' · '+ruleDetailsLabel(),'',{node:buildRuleDetailNode(gameId),cancel:false,confirmText:t('confirm')})}
+ 2114 syncRuleControls :: function syncRuleControls(gameId,family,def,box){var draft=ruleDrafts[gameId]||{};def.fields.forEach(function(f){var el=box.querySelector('[data-rule-key="'+f.key+'"]');if(!el)retu
+ 2115 renderRuleFields :: function renderRuleFields(){var box=$('ruleFields');if(!box)return;var locked=box.closest('fieldset[disabled]');if(locked&&$('createForm')&&$('createForm').contains(locked))locked.
+ 2116 renderGameCatalog :: function renderGameCatalog(){var sel=$('gameId'),current=sel.value;sel.textContent='';$('gameList').textContent='';var goGroup=document.createElement('optgroup');goGroup.label=lang
+ 2117 openRoomGate :: function openRoomGate(code){code=cleanCode(code);if(code.length!==6)return;gateCode=code;history.pushState(null,'',roomPath(code));showView('roomGate');$('gateTitle').textContent=c
+ 2118 renderGate :: function renderGate(info){if(!info)return;$('gateTitle').textContent=info.name;$('gateMeta').textContent=gameText(info.gameId,0)+' · '+info.id+' · '+info.playerCount+'/2'+(info.que
+ 2119 enterGate :: function enterGate(role){if(!gateCode)return;var name=$('gateName').value.trim(),password=$('gatePassword').value;if(!name){setGateNotice(t('yourName'),true);return}setGateNotice(t
+ 2120 publicRoomMatches :: function publicRoomMatches(r,q){if(!q)return true;var hay=[r.id,r.name,gameText(r.gameId,0),statusText(r.status)].join(' ').toLocaleLowerCase();return hay.indexOf(q.toLocaleLowerCa
+ 2121 makePublicRoomRow :: function makePublicRoomRow(r){var row=document.createElement('div');row.className='room-row';var info=document.createElement('div');var a=document.createElement('strong');a.textCon
+ 2122 renderPublicRoomColumn :: function renderPublicRoomColumn(list,rooms,emptyText){list.textContent='';if(!rooms.length){list.className='room-list muted';var e=document.createElement('div');e.className='small 
+ 2123 renderPublicRooms :: function renderPublicRooms(rooms){rooms=(rooms||[]).filter(function(r){return r.status==='playing'||r.status==='waiting'});var q=$('roomSearch')?$('roomSearch').value.trim():'';var
+ 2124 refreshRooms :: function refreshRooms(){var playing=$('playingRoomList'),waiting=$('waitingRoomList');if(window.boardverseBindingMissing){playing.textContent='Cloudflare Durable Object: ROOMS → Ga
+ 2125 connectRoom :: function connectRoom(){if(!session)return;if(ws){try{ws.close()}catch(e){}}history.replaceState(null,'',roomPath(session.roomId));showView('room');var proto=location.protocol==='ht
+ 2126 send :: function send(obj){if(!ws||ws.readyState!==WebSocket.OPEN){setRoomNotice('WebSocket offline',true);return false}ws.send(JSON.stringify(obj));return true}
+ 2127 renderRoom :: function renderRoom(){var r=roomState;if(!r)return;$('roomTitle').textContent=r.name;$('roomMeta').textContent=gameText(r.gameId,0)+' · '+(r.privateRoom?(lang==='en'?'Private':'私人房
+ 2128 renderPlayers :: function renderPlayers(r){var el=$('players');el.textContent='';[[t('playerA'),r.players.host],[t('playerB'),r.players.guest]].forEach(function(pair){var d=document.createElement('
+ 2129 renderPending :: function renderPending(r){var box=$('pendingBox'),list=$('pendingList');list.textContent='';if(r.isHost&&r.pending.length){box.classList.remove('hidden');r.pending.forEach(function
+ 2130 renderQueue :: function renderQueue(r){$('queueMeta').textContent=t('queueCount')+' '+r.queue.length+' · '+t('spectatorCount')+' '+r.spectatorCount;$('hostQueueSettings').classList.toggle('hidden
+ 2131 goEstimateNumber :: function goEstimateNumber(n){var x=Number(n)||0;return Math.round(x*10)/10}
+ 2132 goPositionText :: function goPositionText(d,unit){var a=Math.abs(d),u=unit||'';if(d===0)return lang==='en'?'Current position: even':lang==='zh-Hans'?'当前形势：双方持平':'目前形勢：雙方持平';if(d>0)return lang==='en'
+ 2133 renderGoEstimate :: function renderGoEstimate(r,g){var el=$('goEstimate');if(!el)return;var e=g&&g.liveEstimate;if(!e||g.type!=='go'||r.status!=='playing'){el.classList.add('hidden');el.textContent=''
+ 2134 refreshLastMoveMarkerLabel :: function refreshLastMoveMarkerLabel(){var label=lang==='en'?'Last move marker':lang==='zh-Hans'?'上一手标记':'上一手標記';$('lastMoveMarkerLabel').textContent=label;$('lastMoveMarkerToggle')
+ 2135 setLastMoveMarkerEnabled :: function setLastMoveMarkerEnabled(enabled){document.body.classList.toggle('hide-last-move-dot',!enabled)}
+ 2136 renderStatus :: function renderStatus(r){var g=r.gameState;$('turnInfo').textContent=r.status==='playing'?t('turn')+' '+sideName(r.gameId,g.turn):r.status==='waiting'?t('waiting'):t('finished');va
+ 2137 renderReplays :: function renderReplays(r){var list=$('replayList');list.textContent='';var items=Array.isArray(r.replays)?r.replays:[];if(!items.length){var e=document.createElement('div');e.class
+ 2138 openReplay :: function openReplay(data){if(!data||!Array.isArray(data.frames)||!data.frames.length){toast('Replay unavailable','bad');return}replayData=data;replayIndex=0;$('replayMatchTitle').t
+ 2139 closeReplay :: function closeReplay(){$('replayOverlay').classList.add('hidden');replayData=null;replayIndex=0}
+ 2140 renderReplayFrame :: function renderReplayFrame(){if(!replayData)return;var frames=replayData.frames,frame=frames[Math.max(0,Math.min(replayIndex,frames.length-1))];replayIndex=frame.index;$('replayRan
+ 2141 replayStep :: function replayStep(delta){if(!replayData)return;replayIndex=Math.max(0,Math.min(replayData.frames.length-1,replayIndex+delta));renderReplayFrame()}
+ 2142 renderChat :: function renderChat(r){var list=$('chatList'),input=$('chatInput'),btn=$('chatSend'),blocked=r.chatChannel==='none';$('chatTitle').textContent=r.chatChannel==='players'?t('playersC
+ 2143 renderRules :: function renderRules(r){$('ruleInfo').textContent=localizedRulesSummary(r.gameId,r.rules,r.ruleDefs)||gameText(r.gameId,1);var list=$('roomRuleList');list.textContent='';var def=r.
+ 2144 makeSvg :: function makeSvg(rows,cols,type){var svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','-0.5 -0.5 '+cols+' '+rows);svg.setAttribute('aria-
+ 2145 starPoints :: function starPoints(n){if(n===19)return [[3,3],[3,9],[3,15],[9,3],[9,9],[9,15],[15,3],[15,9],[15,15]];if(n===13)return [[3,3],[3,9],[6,6],[9,3],[9,9]];if(n===9)return [[2,2],[2,6],
+ 2146 intrinsicBoardSize :: function intrinsicBoardSize(g){if(g.type==='xiangqi')return{w:540,h:600};if(g.type==='go'||g.type==='gomoku'||g.type==='renju'){var n=g.size||15;var s=n>=19?620:n>=15?540:n>=13?500
+ 2147 fitBoardToStage :: function fitBoardToStage(el,g){if(!el||!g)return;var fit=$('boardFit'),stage=$('boardStage');if(!fit||!stage)return;var base=intrinsicBoardSize(g);var desktop=document.body.classLi
+ 2148 renderBoard :: function renderBoard(){if(!roomState||!roomState.gameState)return;renderGameBoard(roomState.gameState,$('board'),true);requestAnimationFrame(function(){fitBoardToStage($('board'),r
+ 2149 renderGameBoard :: function renderGameBoard(g,el,interactive){if(!g||!el)return;el.textContent='';if(g.type==='go'||g.type==='gomoku'||g.type==='renju')renderIntersectionBoard(g,el,interactive);else 
+ 2150 renderIntersectionBoard :: function renderIntersectionBoard(g,el,interactive){var n=g.size;el.className='board line-board';el.style.width='100%';el.style.maxWidth=n>=19?'620px':n>=15?'540px':n>=13?'500px':'4
+ 2151 renderXiangqi :: function renderXiangqi(g,el,interactive){el.className='board xiangqi-board';el.style.width='100%';el.style.maxWidth='560px';el.appendChild(makeSvg(10,9,'xq'));for(var i=0;i<90;i++)
+ 2152 renderSquareBoard :: function renderSquareBoard(g,el,interactive){var size=Number(g.size)||8;el.className='board square-board '+(g.type==='chess'?'chess-board':'reversi-board');el.style.width='100%';el
+ 2153 bindPoint :: function bindPoint(el,index,rows,cols){el.addEventListener('click',function(){boardClick(index,rows,cols)})}
+ 2154 stone :: function stone(p){var s=document.createElement('span');s.className='stone '+(p==='B'?'black':'white');return s}
+ 2155 xqPiece :: function xqPiece(p){var m={rK:'帥',rA:'仕',rE:'相',rH:'傌',rR:'俥',rC:'炮',rP:'兵',bK:'將',bA:'士',bE:'象',bH:'馬',bR:'車',bC:'砲',bP:'卒'},s=document.createElement('span');s.className='xq-piece
+ 2156 chessPiece :: function chessPiece(p){var m={wK:'♔',wQ:'♕',wR:'♖',wB:'♗',wN:'♘',wP:'♙',bK:'♚',bQ:'♛',bR:'♜',bB:'♝',bN:'♞',bP:'♟'},s=document.createElement('span');s.className='chess-piece '+(p[0]
+ 2157 boardClick :: function boardClick(index,rows,cols){var r=roomState,g=r&&r.gameState;if(!r||r.rawRole!=='player'||r.status!=='playing'||r.mySide!==g.turn)return;var row=Math.floor(index/cols),col
+ 2158 ensureAudio :: function ensureAudio(){if(!audioCtx){var AC=window.AudioContext||window.webkitAudioContext;if(AC)audioCtx=new AC()}if(audioCtx&&audioCtx.state==='suspended')audioCtx.resume().catch
+ 2159 playSound :: function playSound(kind){if(!$('soundEnabled').checked)return;ensureAudio();if(!audioCtx)return;var volume=Number($('soundVolume').value)||0.4;var now=audioCtx.currentTime;var osc=
+ 2160 setupNotifications :: function setupNotifications(){if(!('serviceWorker'in navigator)||!('Notification'in window)){toast(t('notifyFallback'),'bad');return Promise.resolve(false)}return navigator.service
+ 2161 notifyQueueTurn :: function notifyQueueTurn(){playSound('queue');var url=roomUrl(session&&session.roomId||pathCode());if(typeof Notification==='undefined'||Notification.permission!=='granted'||!('ser
+ 2162 setBindingState :: function setBindingState(ready){window.boardverseBindingMissing=!ready;$('platformSetup').classList.toggle('hidden',ready);document.querySelectorAll('#createForm button[type=submit
+ 2163 checkPlatform :: function checkPlatform(){return fetch('/health',{cache:'no-store'}).then(function(r){return r.json()}).then(function(d){setBindingState(!!d.durableObjectBinding);return !!d.durable
+ 2165 savedPageTheme :: var savedPageTheme=localStorage.getItem('boardversePageTheme')||localStorage.getItem('boardversePageBackground')||localStorage.getItem('boardverseBoardBackground')||'black';var pag
+ 2166 lastMoveMarkerEnabled :: var lastMoveMarkerEnabled=localStorage.getItem('boardverseLastMoveMarker')!=='off';$('lastMoveMarkerToggle').checked=lastMoveMarkerEnabled;setLastMoveMarkerEnabled(lastMoveMarkerEn
