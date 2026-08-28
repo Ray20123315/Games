@@ -1,0 +1,41 @@
+name: Inspect BoardVerse v0.0.21 Go grouping
+on:
+  push:
+    branches: [feature/group-go-sizes-v0.0.21]
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build current v0.0.20
+        working-directory: BoardVerse
+        run: |
+          node build-worker.mjs
+          node post-build-v009.mjs
+          node post-build-v010.mjs
+          node post-build-v011.mjs
+          node post-build-v012.mjs
+          node post-build-v013.mjs
+          node post-build-v014.mjs
+          node post-build-v015.mjs
+          node post-build-v016.mjs
+          node post-build-v017.mjs
+          node post-build-v018.mjs
+          node post-build-v019.mjs
+          node post-build-v020.mjs
+          node --check worker.js
+      - name: Inspect Go ids and catalog
+        working-directory: BoardVerse
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const s=await readFile('worker.js','utf8');
+          for(const needle of ['圍棋 9×9','围棋 9×9','Go 9×9','function renderGameCatalog','const GAMES','const SERVER_GAMES']){
+            const i=s.indexOf(needle);
+            console.log('\n### '+needle+' @ '+i);
+            if(i>=0)console.log(s.slice(Math.max(0,i-1200),i+4000));
+          }
+          NODE
