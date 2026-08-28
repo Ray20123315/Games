@@ -1,0 +1,40 @@
+name: Inspect BoardVerse hotfix
+on:
+  push:
+    branches: [hotfix/game-end-resign-v0.0.12]
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build current worker
+        working-directory: BoardVerse
+        run: |
+          node build-worker.mjs
+          node post-build-v009.mjs
+          node post-build-v010.mjs
+          node post-build-v011.mjs
+          node --check worker.js
+      - name: Show relevant source context
+        working-directory: BoardVerse
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('worker.js').read_text()
+          terms=['webSocketMessage','forfeit','resign','finishGame','finished','gameOver','winner','applyMove','move','alarm()']
+          for term in terms:
+              print('\n===== TERM',term,'=====')
+              start=0
+              count=0
+              while True:
+                  i=s.find(term,start)
+                  if i<0: break
+                  print('\n--- occurrence',count+1,'at',i,'---')
+                  print(s[max(0,i-1800):min(len(s),i+3200)])
+                  start=i+len(term)
+                  count+=1
+                  if count>=8: break
+          PY
