@@ -1,0 +1,66 @@
+name: Inspect BoardVerse v0.0.24 xiangqi variants
+on:
+  push:
+    branches: [feature/xiangqi-variants-room-times-v0.0.24]
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build current v0.0.23
+        working-directory: BoardVerse
+        run: |
+          node build-worker.mjs
+          node post-build-v009.mjs
+          node post-build-v010.mjs
+          node post-build-v011.mjs
+          node post-build-v012.mjs
+          node post-build-v013.mjs
+          node post-build-v014.mjs
+          node post-build-v015.mjs
+          node post-build-v016.mjs
+          node post-build-v017.mjs
+          node post-build-v018.mjs
+          node post-build-v019.mjs
+          node post-build-v020.mjs
+          node post-build-v021.mjs
+          node post-build-v022.mjs
+          node post-build-v023.mjs
+          node --check worker.js
+      - name: Inspect relevant markers
+        working-directory: BoardVerse
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFile} from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
+          const s=await readFile('worker.js','utf8');
+          console.log('BYTES='+Buffer.byteLength(s));
+          console.log('SHA='+createHash('sha256').update(s).digest('hex'));
+          const needles=[
+            'const APP_VERSION',
+            'const GAME_DEFS',
+            'function createGame',
+            'function makeGame',
+            'function newGame',
+            'function initialXiangqi',
+            'function legalXiangqi',
+            'function applyXiangqi',
+            'type === "xiangqi"',
+            "type==='xiangqi'",
+            'function renderPublicRooms',
+            'publicRooms',
+            'createdAt',
+            'startedAt',
+            'startTime',
+            'status:"waiting"',
+            'gameId',
+            'function gameText',
+            '<select id="gameId"'
+          ];
+          for(const needle of needles){
+            const i=s.indexOf(needle); console.log('\n### '+needle+' @ '+i); if(i>=0)console.log(s.slice(Math.max(0,i-1800),i+6500));
+          }
+          NODE
