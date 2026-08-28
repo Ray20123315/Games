@@ -1,0 +1,34 @@
+name: Inspect BoardVerse piece colors
+on:
+  push:
+    branches: [hotfix/game-end-resign-v0.0.12]
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build worker
+        working-directory: BoardVerse
+        run: |
+          node build-worker.mjs
+          node post-build-v009.mjs
+          node post-build-v010.mjs
+          node post-build-v011.mjs
+          node post-build-v012.mjs
+          node --check worker.js
+      - name: Show exact piece colors and renderers
+        working-directory: BoardVerse
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('worker.js').read_text()
+          terms=['.stone{','.stone.black','.stone.white','.chess-piece{','.chess-piece.white','.chess-piece.black','function renderIntersectionBoard','function renderSquareBoard','CHESS_GLYPHS']
+          for term in terms:
+              i=s.find(term)
+              print('\n===== '+term+' @ '+str(i)+' =====')
+              if i >= 0:
+                  print(s[max(0,i-700):min(len(s),i+6500)])
+          PY
