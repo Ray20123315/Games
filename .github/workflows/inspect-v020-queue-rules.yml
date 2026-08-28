@@ -1,0 +1,39 @@
+name: Inspect BoardVerse v0.0.20 queue and rule detail markers
+on:
+  push:
+    branches: [feature/queue-rule-details-v0.0.20]
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build current worker
+        working-directory: BoardVerse
+        run: |
+          node build-worker.mjs
+          node post-build-v009.mjs
+          node post-build-v010.mjs
+          node post-build-v011.mjs
+          node post-build-v012.mjs
+          node post-build-v013.mjs
+          node post-build-v014.mjs
+          node post-build-v015.mjs
+          node post-build-v016.mjs
+          node post-build-v017.mjs
+          node post-build-v018.mjs
+          node post-build-v019.mjs
+          node --check worker.js
+      - name: Print queue and rules contexts
+        working-directory: BoardVerse
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const s=await readFile('worker.js','utf8');
+          for(const needle of ['winner_stays','rotate_both','rotationRoom','queueEnabledRoom','SERVER_RULES','const RULES','renderGameCatalog','function renderGameCatalog','function openHelp','function fieldTranslation','function helpTranslation','function optionTranslation','function rotate','function advance','queue.shift','rematch','game-card{']){
+            let start=0,hit=0;
+            while(true){const i=s.indexOf(needle,start);if(i<0)break;hit++;console.log('\n### '+needle+' #'+hit+' @ '+i);console.log(s.slice(Math.max(0,i-1400),i+3600));start=i+needle.length;if(hit>=4)break;}
+          }
+          NODE
