@@ -29,6 +29,7 @@ jobs:
           node post-build-v021.mjs
           node post-build-v022.mjs
           node post-build-v023.mjs
+          node sim-v024-compat.mjs
           node sim-v024.mjs
           node --check worker.js
       - name: Verify v0.0.24 markers and hidden-state safety
