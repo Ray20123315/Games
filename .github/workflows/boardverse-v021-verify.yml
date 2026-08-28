@@ -1,0 +1,78 @@
+name: BoardVerse v0.0.21 verify
+
+on:
+  push:
+    branches:
+      - fix/boardverse-v0.0.21-rule-controls
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build deterministic worker
+        working-directory: BoardVerse
+        run: |
+          node build-worker.mjs
+          node post-build-v009.mjs
+          node post-build-v010.mjs
+          node post-build-v011.mjs
+          node post-build-v012.mjs
+          node post-build-v013.mjs
+          node post-build-v014.mjs
+          node post-build-v015.mjs
+          node post-build-v016.mjs
+          node post-build-v017.mjs
+          node post-build-v018.mjs
+          node post-build-v019.mjs
+          node post-build-v020.mjs
+          node post-build-v021.mjs
+      - name: Verify v0.0.20 features and v0.0.21 rule controls
+        working-directory: BoardVerse
+        run: |
+          node --check worker.js
+          node <<'NODE'
+          const fs = require('node:fs');
+          const cp = require('node:child_process');
+          const os = require('node:os');
+          const path = require('node:path');
+          const crypto = require('node:crypto');
+          const source = fs.readFileSync('worker.js', 'utf8');
+          function assert(ok, message) { if (!ok) throw new Error(message); }
+          assert(source.includes('const APP_VERSION = "0.0.21";'), 'v0.0.21 marker missing');
+          assert(source.includes('host_stays'), 'user v0.0.20 host-stays feature missing');
+          assert(source.includes('function openGameRuleDetails(gameId)'), 'user v0.0.20 rule-guide feature missing');
+          assert(source.includes('top-theme-setting'), 'user v0.0.20 topbar theme feature missing');
+          assert(source.includes('var ruleDrafts=window.__boardverseRuleDrafts||(window.__boardverseRuleDrafts={});'), 'persistent rule draft store missing');
+          assert(source.includes('function syncRuleControls(gameId,family,def,box)'), 'syncRuleControls missing');
+          assert(!source.includes("ruleDrafts[gameId].opening='none';renderRuleFields()"), 'stale rule-form rebuild handler remains');
+          const handler = source.match(/el\.addEventListener\('change',function\(\)\{saveDraft\(\);if\(family==='go'[\s\S]*?\}\);box\.appendChild\(row\)/);
+          assert(handler, 'rule change handler not found');
+          assert(!handler[0].includes('renderRuleFields()'), 'rule change handler still rebuilds the form');
+          assert(handler[0].includes('syncRuleControls(gameId,family,def,box)'), 'rule change handler does not sync in place');
+          const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'boardverse-inline-'));
+          const scripts = [...source.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)].map(m => m[1]);
+          assert(scripts.length > 0, 'no inline browser scripts found');
+          let checked = 0;
+          scripts.forEach((code, i) => {
+            if (!code.trim()) return;
+            const file = path.join(dir, `inline-${i}.js`);
+            fs.writeFileSync(file, code);
+            cp.execFileSync(process.execPath, ['--check', file], {stdio:'inherit'});
+            checked++;
+          });
+          const sha = crypto.createHash('sha256').update(Buffer.from(source)).digest('hex');
+          console.log(`INLINE_SCRIPTS_CHECKED=${checked}`);
+          console.log(`BOARDVERSE_V021_SHA256=${sha}`);
+          NODE
+      - name: Upload built worker
+        uses: actions/upload-artifact@v4
+        with:
+          name: boardverse-v021-worker
+          path: BoardVerse/worker.js
+          if-no-files-found: error
