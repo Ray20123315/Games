@@ -1,16 +1,16 @@
-name: Inspect BoardVerse v0.0.24 architecture
+name: Simulate BoardVerse v0.0.24
 on:
   push:
     branches: [feature/game-variants-opening-allocation-v0.0.24]
 jobs:
-  inspect:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build current v0.0.23
+      - name: Build and simulate v0.0.24
         working-directory: BoardVerse
         run: |
           node build-worker.mjs
@@ -29,17 +29,18 @@ jobs:
           node post-build-v021.mjs
           node post-build-v022.mjs
           node post-build-v023.mjs
+          node sim-v024.mjs
           node --check worker.js
-      - name: Inspect exact mutation edge cases
+      - name: Verify v0.0.24 markers and hidden-state safety
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
           const s=await readFile('worker.js','utf8');
-          const needles=['function sideFor(','function sanitizeLobbyRecord(','  async initRoom(','  assignSeat(','  finishMatch(','  archiveReplay(','  async handlePass(','  async handleResign(','  async alarm(','export class GameRoom'];
-          for(const needle of needles){
-            let from=0,count=0;
-            while(true){const i=s.indexOf(needle,from);if(i<0)break;count++;console.log('\n### '+needle+' #'+count+' @ '+i);console.log(s.slice(Math.max(0,i-1200),Math.min(s.length,i+8000)));from=i+needle.length;if(count>=3)break;}
-            if(!count)console.log('\n### '+needle+' @ -1');
-          }
+          const markers=['const APP_VERSION = "0.0.24";','GAME_CATALOG.banqi','GAME_CATALOG.xiangqi_random','function applyBanqi(','secretParity','publicOpening(room)','opening_guess','opening_hand','roomTimingText(r)','renderBanqi(g,el,interactive)'];
+          for(const m of markers) if(!s.includes(m)) throw new Error('missing '+m);
+          if(!s.includes('if (out?.type === "banqi" && Array.isArray(out.covered))')) throw new Error('banqi masking missing');
+          console.log('V024_BYTES='+Buffer.byteLength(s));
+          console.log('V024_SHA256='+createHash('sha256').update(s).digest('hex'));
           NODE
