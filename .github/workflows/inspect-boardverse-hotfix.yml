@@ -2,6 +2,8 @@ name: Inspect BoardVerse hotfix
 on:
   push:
     branches: [hotfix/game-end-resign-v0.0.12]
+  pull_request:
+    branches: [main]
 jobs:
   inspect:
     runs-on: ubuntu-latest
