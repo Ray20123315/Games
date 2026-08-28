@@ -26,13 +26,13 @@ jobs:
           node post-build-v018.mjs
           node post-build-v019.mjs
           node --check worker.js
-      - name: Print rule definitions
+      - name: Print exact insertion contexts
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import { readFile } from 'node:fs/promises';
           const s=await readFile('worker.js','utf8');
-          for(const needle of ['const RULE_DEFS','var RULE_OPTION_I18N','var RULE_HELP_I18N']){
-            const i=s.indexOf(needle);console.log('\n### '+needle+' @ '+i);if(i>=0)console.log(s.slice(i,i+16000));
+          for(const needle of ['rotation:"輪替方式"','rotation:"轮换方式"','rotation:"Rotation"','<select id="rotationCreate"','<select id="rotationRoom"','function renderGameCatalog()','rotateAfterMatch(result)','async queueSettings(token, msg)','function defaultRoomSettings(input = {})','.game-card{']){
+            const i=s.indexOf(needle);console.log('\n### '+needle+' @ '+i);if(i>=0)console.log(s.slice(Math.max(0,i-1200),i+6500));
           }
           NODE
