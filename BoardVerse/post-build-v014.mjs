@@ -1,0 +1,48 @@
+import { readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+
+const worker = new URL("./worker.js", import.meta.url);
+const sourceSha256 = "5e86536425ca0749ef970a442e8307245bf5149f37ded06e144c10cc509c3dea";
+const expectedSha256 = "1c6553c435c521a2b66bb757e78b28e6f78172193a5f8bd0d261b5bb3cb841ea";
+const input = await readFile(worker);
+const actualSourceSha256 = createHash("sha256").update(input).digest("hex");
+if (actualSourceSha256 !== sourceSha256) throw new Error(`v0.0.13 worker SHA-256 mismatch: ${actualSourceSha256}`);
+let source = input.toString("utf8");
+function replaceExact(from, to, label) {
+  const first = source.indexOf(from);
+  if (first < 0) throw new Error(`${label} marker not found`);
+  if (source.indexOf(from, first + from.length) >= 0) throw new Error(`${label} marker is not unique`);
+  source = source.replace(from, to);
+}
+
+replaceExact('const APP_VERSION = "0.0.13";', 'const APP_VERSION = "0.0.14";', "version");
+
+replaceExact(
+  '.reversi-board{background:#245e42}.board>svg{',
+  '.reversi-board{background:#245e42}.board-bg-setting{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:10px;padding-top:9px;border-top:1px solid rgba(255,255,255,.08)}.board-bg-setting label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}.board-bg-setting input[type=color]{width:38px;height:30px;padding:2px;border:1px solid #40506a;border-radius:8px;background:#0c121a;cursor:pointer}.board-bg-setting .btn{min-height:30px;padding:4px 9px;font-size:12px}body.custom-board-bg .line-board{background:linear-gradient(135deg,var(--board-bg-light),var(--board-bg-dark))}body.custom-board-bg .xiangqi-board{background:linear-gradient(145deg,var(--board-bg-light),var(--board-bg-dark))}body.custom-board-bg .chess-board .sq.light{background:var(--board-bg-light)}body.custom-board-bg .chess-board .sq.dark{background:var(--board-bg-dark)}body.custom-board-bg .reversi-board .sq.light,body.custom-board-bg .reversi-board .sq.dark{background:var(--board-bg);border-color:var(--board-bg-dark)}.board>svg{',
+  "board background css"
+);
+
+replaceExact(
+  '<section class="status-card card"><div id="turnInfo" class="turn-banner"></div><div id="roleInfo" class="role-line"></div><div id="resultBanner" class="result-banner hidden"><div id="resultTitle" class="result-title"></div><div id="resultReason" class="result-reason"></div></div><div class="actions">',
+  '<section class="status-card card"><div id="turnInfo" class="turn-banner"></div><div id="roleInfo" class="role-line"></div><div id="resultBanner" class="result-banner hidden"><div id="resultTitle" class="result-title"></div><div id="resultReason" class="result-reason"></div></div><div class="board-bg-setting"><label for="boardBgColor"><span id="boardBgLabel">棋盤背景</span><input id="boardBgColor" type="color" value="#c79655" aria-label="棋盤背景"></label><button id="boardBgReset" class="btn ghost" type="button">預設</button></div><div class="actions">',
+  "board background controls"
+);
+
+replaceExact(
+  'function $(id){return document.getElementById(id)}\nfunction localeKey(){',
+  'function $(id){return document.getElementById(id)}\nfunction isBoardBgColor(v){return /^#[0-9a-f]{6}$/i.test(String(v||\'\'))}\nfunction boardBgShade(hex,amount){var n=parseInt(hex.slice(1),16),p=Math.max(-1,Math.min(1,amount)),t=p<0?0:255,q=Math.abs(p),r=n>>16,g=n>>8&255,b=n&255;function c(x){return Math.round((t-x)*q+x).toString(16).padStart(2,\'0\')}return \'#\'+c(r)+c(g)+c(b)}\nfunction applyBoardBackground(value){var v=isBoardBgColor(value)?String(value).toLowerCase():\'\';document.body.classList.toggle(\'custom-board-bg\',!!v);[\'--board-bg\',\'--board-bg-light\',\'--board-bg-dark\'].forEach(function(k){document.documentElement.style.removeProperty(k)});if(v){document.documentElement.style.setProperty(\'--board-bg\',v);document.documentElement.style.setProperty(\'--board-bg-light\',boardBgShade(v,.24));document.documentElement.style.setProperty(\'--board-bg-dark\',boardBgShade(v,-.2))}return v}\nfunction refreshBoardBgLabels(){var label=lang===\'en\'?\'Board background\':lang===\'zh-Hans\'?\'棋盘背景\':\'棋盤背景\',reset=lang===\'en\'?\'Default\':lang===\'zh-Hans\'?\'默认\':\'預設\';$(\'boardBgLabel\').textContent=label;$(\'boardBgColor\').setAttribute(\'aria-label\',label);$(\'boardBgReset\').textContent=reset}\nfunction localeKey(){',
+  "board background helpers"
+);
+
+replaceExact(
+  "$('languageSelect').addEventListener('change',function(){lang=this.value;localStorage.setItem('boardverseLang',lang);applyLanguage()});\n$('soundEnabled').checked=localStorage.getItem('boardverseSound')!=='off';",
+  "$('languageSelect').addEventListener('change',function(){lang=this.value;localStorage.setItem('boardverseLang',lang);applyLanguage()});\nvar savedBoardBg=localStorage.getItem('boardverseBoardBackground')||'';if(isBoardBgColor(savedBoardBg))$('boardBgColor').value=savedBoardBg;applyBoardBackground(savedBoardBg);refreshBoardBgLabels();$('languageSelect').addEventListener('change',refreshBoardBgLabels);$('boardBgColor').addEventListener('input',function(){var v=applyBoardBackground(this.value);if(v)localStorage.setItem('boardverseBoardBackground',v)});$('boardBgReset').addEventListener('click',function(){localStorage.removeItem('boardverseBoardBackground');$('boardBgColor').value='#c79655';applyBoardBackground('')});\n$('soundEnabled').checked=localStorage.getItem('boardverseSound')!=='off';",
+  "board background persistence"
+);
+
+const out = Buffer.from(source, "utf8");
+const actualSha256 = createHash("sha256").update(out).digest("hex");
+if (actualSha256 !== expectedSha256) throw new Error(`v0.0.14 worker SHA-256 mismatch: ${actualSha256}`);
+await writeFile(worker, out);
+console.log(`Patched BoardVerse v0.0.14 worker.js (${out.length} bytes, SHA-256 ${actualSha256})`);
