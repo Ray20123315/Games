@@ -1,43 +1,27 @@
 # BoardVerse
 
-多人棋類 Cloudflare Worker。v0.0.4 主要功能：
+BoardVerse v0.0.5 是 Cloudflare Worker + Durable Object 的多人棋室。
 
-- 圍棋 9×9 / 13×13 / 19×19、五子棋、Renju、象棋、西洋棋、Reversi。
-- 各棋類可用的規則／變種設定由伺服器驗證，不提供未實作的假選項。
-- 公開房／私人房；私人房以 `https://多人棋室.ray2025.com/<房號>` 進入，再選玩家或觀戰。
-- 私人玩家入席審核；觀戰可直接進入；滿席時可依房間設定加入排隊。
-- 房主可調整排隊順序並選擇「勝者留桌」或「雙方輪替」。
-- 玩家聊天室與觀眾聊天室完全分流，玩家不會收到觀眾聊天內容。
-- 繁體中文、簡體中文、English；自製 Popover / Modal / Toast，不使用原生 alert / confirm / prompt / title tooltip。
-- 本地合成落子／提示音；排隊輪到時優先 Service Worker 通知，失敗則提示音。
-- 可選回場密碼；房間內名稱不可重複。
-- 玩家在進行中的棋局連續離線 60 秒會由 Durable Object Alarm 伺服器端自動判定認輸；60 秒內重連會取消。
-- 公開房列表只顯示最近 24 小時有建立／活動且仍 waiting/playing 的公開房；finished 立即移除。
-- 桌面採 16:9 主工作區，行動版改為安全重排避免整頁橫向溢位。
+本版重點：
+- 修正首頁語系初始化回歸：繁體、简体、English 均可正常顯示 8 種棋類與規則設定。
+- 首頁／房號入口使用自然頁面高度；只有實際局內桌面版套用 16:9 工作區，手機維持直向響應式。
+- 完成對局會在 Durable Object 中保留最近 12 局回放；房內可用自製回放視窗逐手查看棋盤與結果。
+- 保留 v0.0.4：公開／私人房、玩家／觀戰、私人房審核、排隊輪替、觀眾獨立聊天室、三語 UI、落子／排隊提示音、自製 Popover/Modal/Toast、同房禁重名、選填回場密碼、60 秒離線自動認輸。
+- 公開大廳只顯示最近 24 小時仍 waiting/playing 的公開房；finished 房立即移除。
+- 房間網址：`https://多人棋室.ray2025.com/<ROOMCODE>`。
 
-## 建置與部署
+## Cloudflare Git Build
 
-Cloudflare Git Build 的 Root directory 設為 `BoardVerse`。`wrangler.jsonc` 已設定 custom build，所以直接：
+Root directory：`BoardVerse`
+
+部署：
 
 ```bash
 npx wrangler@latest deploy
 ```
 
-也可先本機驗證：
+`wrangler.jsonc` 的 custom build 會先執行 `node build-worker.mjs`，由 `.source/` 的 gzip/Base64 分片重建 `worker.js`，並強制驗證 SHA-256：
 
-```bash
-node build-worker.mjs
-node --check worker.js
-```
+`fb0b4485498e2be629258d4f43bcda8ee5a335d4ea3723ad0f3d964468ab3fad`
 
-預期 `worker.js` SHA-256：
-
-`b598525c198309a7f1decca80e4c9fc1b400c35408bd1350aa11f59aec48bbf5`
-
-Wrangler 內含：
-
-- Worker：`crimson-haze-0a4d`
-- Custom Domain：`xn--gmqt6w03b11v.ray2025.com`（`多人棋室.ray2025.com`）
-- Durable Object binding：`ROOMS → GameRoom`
-- Storage：SQLite
-- Custom build：`node build-worker.mjs`
+Durable Object：`ROOMS → GameRoom`，SQLite storage。
