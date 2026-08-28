@@ -1,0 +1,36 @@
+name: Inspect BoardVerse v0.0.18 theme markers
+on:
+  push:
+    branches: [style/black-white-gold-v0.0.18]
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build current worker
+        working-directory: BoardVerse
+        run: |
+          node build-worker.mjs
+          node post-build-v009.mjs
+          node post-build-v010.mjs
+          node post-build-v011.mjs
+          node post-build-v012.mjs
+          node post-build-v013.mjs
+          node post-build-v014.mjs
+          node post-build-v015.mjs
+          node post-build-v016.mjs
+          node post-build-v017.mjs
+          node --check worker.js
+      - name: Print theme contexts
+        working-directory: BoardVerse
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const s=await readFile('worker.js','utf8');
+          for(const needle of ['.btn{','.btn.primary','--accent','pageBgColor','function applyPageBackground','function refreshPageBgLabels','var savedPageBg=','.go-estimate{','.turn-banner{','.result-banner{','.info-btn{']){
+            const i=s.indexOf(needle); console.log('\n### '+needle+' @ '+i); if(i>=0) console.log(s.slice(Math.max(0,i-500),i+1800));
+          }
+          NODE
