@@ -30,23 +30,22 @@ jobs:
           node post-build-v022.mjs
           node post-build-v023.mjs
           node --check worker.js
-      - name: Inspect lifecycle markers
+      - name: Inspect exact markers
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
           const s=await readFile('worker.js','utf8');
           const needles=[
-            'async initRoom(', 'async roomInfo(', 'async enterRoom(', 'async webSocketMessage(',
-            'async handleMessage(', 'msg.type === "move"', "msg.type === 'move'", 'case "move"',
-            'async startMatch(', 'startMatch(', 'beginMatch(', 'currentReplay = {',
-            'async finishMatch(', 'finishMatch(', 'async rotateAfterMatch(',
-            'function applyGameAction(', 'function newReversi(', 'function applyReversi(',
-            'function sanitizeLobbyRecord(', 'function roomView(', 'lobbyRecord()'
+            'const GAME_CATALOG =', 'const RULE_DEFS =', 'function normalizeRules(', 'function rulesSummary(',
+            '<select id="gameId">', '<section class="status-card card">',
+            'var GAMES=', 'var RULES=', 'function renderRuleFields(', 'function formRules(',
+            'function renderPublicRooms(', 'function sideName(', 'function renderPlayers(', 'function renderStatus(',
+            'function intrinsicBoardSize(', 'function renderGameBoard(', 'function renderXiangqi(', 'function boardClick('
           ];
           for(const needle of needles){
-            let from=0,count=0;
-            while(true){const i=s.indexOf(needle,from);if(i<0)break;count++;console.log('\n### '+needle+' #'+count+' @ '+i);console.log(s.slice(Math.max(0,i-1800),Math.min(s.length,i+6500)));from=i+needle.length;if(count>=4)break;}
-            if(!count)console.log('\n### '+needle+' @ -1');
+            const i=s.indexOf(needle);
+            console.log('\n### '+needle+' @ '+i);
+            if(i>=0)console.log(s.slice(Math.max(0,i-1200),Math.min(s.length,i+12000)));
           }
           NODE
