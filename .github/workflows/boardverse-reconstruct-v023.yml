@@ -1,0 +1,75 @@
+name: BoardVerse reconstruct v0.0.23
+
+on:
+  push:
+    branches:
+      - boardverse-full-plan-v010
+
+permissions:
+  contents: write
+
+jobs:
+  reconstruct:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: boardverse-full-plan-v010
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Reconstruct exact worker
+        working-directory: BoardVerse
+        run: |
+          node build-worker.mjs
+          node post-build-v009.mjs
+          node post-build-v010.mjs
+          node post-build-v011.mjs
+          node post-build-v012.mjs
+          node post-build-v013.mjs
+          node post-build-v014.mjs
+          node post-build-v015.mjs
+          node post-build-v016.mjs
+          node post-build-v017.mjs
+          node post-build-v018.mjs
+          node post-build-v019.mjs
+          node post-build-v020.mjs
+          node post-build-v021.mjs
+          node post-build-v022.mjs
+          node post-build-v023.mjs
+          node --check worker.js
+      - name: Record inspectable source baseline
+        working-directory: BoardVerse
+        run: |
+          mkdir -p .migration
+          cp worker.js .migration/current-worker-v023.js
+          sha256sum worker.js | tee .migration/current-worker-v023.sha256
+          wc -c -l worker.js | tee .migration/current-worker-v023.size.txt
+          node - <<'NODE' > .migration/current-worker-v023.symbols.txt
+          const fs = require('fs');
+          const s = fs.readFileSync('worker.js','utf8');
+          const lines = s.split(/\n/);
+          const pats = [
+            /^export\s+class\s+([A-Za-z_$][\w$]*)/,
+            /^export\s+default\b/,
+            /^class\s+([A-Za-z_$][\w$]*)/,
+            /^(?:async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(/,
+            /^(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/,
+          ];
+          for (let i=0;i<lines.length;i++) {
+            const t=lines[i].trim();
+            for (const p of pats) {
+              const m=t.match(p);
+              if (m) { console.log(String(i+1).padStart(5,' ')+' '+(m[1]||'default')+' :: '+t.slice(0,180)); break; }
+            }
+          }
+          NODE
+      - name: Commit reconstruction evidence
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add BoardVerse/.migration/current-worker-v023.js BoardVerse/.migration/current-worker-v023.sha256 BoardVerse/.migration/current-worker-v023.size.txt BoardVerse/.migration/current-worker-v023.symbols.txt
+          git commit -m "Recovery: record reconstructed BoardVerse v0.0.23 worker baseline"
+          git push origin HEAD:boardverse-full-plan-v010
