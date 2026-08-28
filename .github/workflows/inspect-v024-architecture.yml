@@ -1,0 +1,45 @@
+name: Inspect BoardVerse v0.0.24 architecture
+on:
+  push:
+    branches: [feature/game-variants-opening-allocation-v0.0.24]
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build current v0.0.23
+        working-directory: BoardVerse
+        run: |
+          node build-worker.mjs
+          node post-build-v009.mjs
+          node post-build-v010.mjs
+          node post-build-v011.mjs
+          node post-build-v012.mjs
+          node post-build-v013.mjs
+          node post-build-v014.mjs
+          node post-build-v015.mjs
+          node post-build-v016.mjs
+          node post-build-v017.mjs
+          node post-build-v018.mjs
+          node post-build-v019.mjs
+          node post-build-v020.mjs
+          node post-build-v021.mjs
+          node post-build-v022.mjs
+          node post-build-v023.mjs
+          node --check worker.js
+      - name: Inspect architecture markers
+        working-directory: BoardVerse
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFile} from 'node:fs/promises';
+          const s=await readFile('worker.js','utf8');
+          const needles=[
+            'const GAMES','GAME_DEFS','gameId','function createGame','function initial','function makeGame','function startGame',
+            'createdAt','startedAt','finishedAt','publicRooms','function renderPublicRooms','function gameText','function renderRuleFields','function formRules','function localizedRulesSummary',
+            'function renderGameBoard','function renderXiangqi','function boardClick','function applyMove','function xiangqi','queueEnabled','players:'
+          ];
+          for(const needle of needles){const i=s.indexOf(needle);console.log('\n### '+needle+' @ '+i);if(i>=0)console.log(s.slice(Math.max(0,i-2500),Math.min(s.length,i+9000)));}
+          NODE
