@@ -1,0 +1,49 @@
+name: Inspect BoardVerse v0.0.22 last move
+on:
+  push:
+    branches: [feature/last-move-dot-v0.0.22]
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build current v0.0.21
+        working-directory: BoardVerse
+        run: |
+          node build-worker.mjs
+          node post-build-v009.mjs
+          node post-build-v010.mjs
+          node post-build-v011.mjs
+          node post-build-v012.mjs
+          node post-build-v013.mjs
+          node post-build-v014.mjs
+          node post-build-v015.mjs
+          node post-build-v016.mjs
+          node post-build-v017.mjs
+          node post-build-v018.mjs
+          node post-build-v019.mjs
+          node post-build-v020.mjs
+          node post-build-v021.mjs
+          node --check worker.js
+      - name: Inspect board rendering and move state
+        working-directory: BoardVerse
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const s=await readFile('worker.js','utf8');
+          const needles=['function renderBoard','function renderLine','line-board','lastMove','history','moves','actionLog','replayActions','function applyMove','type:"move"','msg.type===\"move\"'];
+          for(const needle of needles){
+            let start=0,count=0;
+            while(count<5){
+              const i=s.indexOf(needle,start);
+              if(i<0)break;
+              console.log('\n### '+needle+' @ '+i+' #'+count);
+              console.log(s.slice(Math.max(0,i-1400),i+5000));
+              start=i+needle.length;
+              count++;
+            }
+          }
+          NODE
