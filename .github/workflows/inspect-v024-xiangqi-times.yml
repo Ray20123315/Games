@@ -1,4 +1,4 @@
-name: Inspect BoardVerse v0.0.24 hooks
+name: Inspect BoardVerse v0.0.24 anchors
 on:
   push:
     branches: [feature/xiangqi-variants-room-times-v0.0.24]
@@ -14,12 +14,11 @@ jobs:
         run: |
           node build-worker.mjs
           for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023; do node post-build-v${v}.mjs; done
-      - name: Extract hooks
+      - name: Extract anchors
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';const s=await readFile('worker.js','utf8');
-          const picks=['function newGame','function newXiangqi','function applyXiangqi','function legalXiangqiMove','function normalizeRules','xiangqi: {','lobbyRecord()','async lobbyRecord','maybeStart','startMatch','startGame','beginMatch','beginGame','this.room.seats[1]','room.seats[1]','seats[1]','status = \'playing\'','status=\'playing\'','status: \'playing\'','currentReplay'];
-          for(const n of picks){let p=s.indexOf(n);console.log('\n@@'+n+' '+p);if(p>=0)console.log(s.slice(Math.max(0,p-700),p+4200).replace(/\n/g,'\\n'));}
-          console.log('\n@@ playing server occurrences');let re=/playing/g,m,c=0;while((m=re.exec(s))&&m.index<100000&&c<20){console.log(m.index+' '+s.slice(Math.max(0,m.index-350),m.index+700).replace(/\n/g,'\\n'));c++}
+          const picks=['lobbyRecord() {','function sanitizeReplayMove','function roomView','var SERVER_GAMES','function gameText','function sideName','function makePublicRoomRow','function renderGameBoard','function intrinsicBoardSize','function boardClick','function xqPiece','<select id="gameId"'];
+          for(const n of picks){let p=s.indexOf(n);console.log('\n@@'+n+' '+p);if(p>=0)console.log(s.slice(Math.max(0,p-500),p+5000).replace(/\n/g,'\\n'));}
           NODE
