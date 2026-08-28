@@ -20,16 +20,16 @@ jobs:
           node post-build-v012.mjs
           node post-build-v013.mjs
           node --check worker.js
-      - name: Inspect UI hooks
+      - name: Inspect exact background hooks
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import { readFile } from 'node:fs/promises';
           const source = await readFile('worker.js','utf8');
-          for (const needle of ['resignBtn','passBtn','square-board','intersection-board','board-wrap','boardShell','game-board','toolbar','controls','localStorage']) {
+          for (const needle of ['.sq.light','.sq.dark','.chess-board','.reversi-board','function renderIntersectionBoard','languageSelect\').addEventListener','applyLanguage();','soundEnabled\').addEventListener']) {
             let start = 0, count = 0;
-            while ((start = source.indexOf(needle, start)) >= 0 && count < 4) {
-              const a = Math.max(0, start - 700), b = Math.min(source.length, start + needle.length + 1200);
+            while ((start = source.indexOf(needle, start)) >= 0 && count < 5) {
+              const a = Math.max(0, start - 900), b = Math.min(source.length, start + needle.length + 1800);
               console.log(`\n--- ${needle} @ ${start} ---\n${source.slice(a,b)}\n`);
               start += needle.length; count++;
             }
