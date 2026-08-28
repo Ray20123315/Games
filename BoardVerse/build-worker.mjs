@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 
 const sourceDir = new URL("./.source/", import.meta.url);
 const output = new URL("./worker.js", import.meta.url);
-const expectedSha256 = "f171ff1da1094d156eef30a2bf9d313cd0f19e794b89d0b7aeb2a3e365916724";
+const expectedSha256 = "fc1e6eb3abf5cb3ab744e4f8a2489908f5bdef498e64526f9b92ff81f70df3ba";
 
 const files = (await readdir(sourceDir))
   .filter((name) => /^worker\.js\.gz\.b64\.\d{3}$/.test(name))
