@@ -1,0 +1,39 @@
+name: Inspect BoardVerse v0.0.20 queue and rules
+on:
+  push:
+    branches: [feature/queue-rules-v0.0.20]
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build current worker
+        working-directory: BoardVerse
+        run: |
+          node build-worker.mjs
+          node post-build-v009.mjs
+          node post-build-v010.mjs
+          node post-build-v011.mjs
+          node post-build-v012.mjs
+          node post-build-v013.mjs
+          node post-build-v014.mjs
+          node post-build-v015.mjs
+          node post-build-v016.mjs
+          node post-build-v017.mjs
+          node post-build-v018.mjs
+          node post-build-v019.mjs
+          node --check worker.js
+      - name: Inspect queue and rule contexts
+        working-directory: BoardVerse
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          const s=await readFile('worker.js','utf8');
+          for(const needle of ['winner_stays','rotate_both','rotationRoom','queueRotation','SERVER_RULES','const RULES','renderGameCatalog','renderRuleFields','fieldTranslation','helpTranslation','optionTranslation','function openHelp','queueEnabled','function rotate','rematch']){
+            let start=0,count=0;
+            while(true){const i=s.indexOf(needle,start);if(i<0||count>=4)break;console.log('\n### '+needle+' @ '+i+' #'+count);console.log(s.slice(Math.max(0,i-900),i+2600));start=i+needle.length;count++;}
+          }
+          NODE
