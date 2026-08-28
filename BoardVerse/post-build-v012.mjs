@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 
 const worker = new URL("./worker.js", import.meta.url);
 const sourceSha256 = "541ff63d982204bdc27256ed3f7f7788dd5a412551923c5476cea05645a19aa3";
+const expectedSha256 = "2d60c0f3379c3837f555c63e9b4b2dc87ffc3d245e66adc43cb8a79d6a04b691";
 const input = await readFile(worker);
 const actualSourceSha256 = createHash("sha256").update(input).digest("hex");
 if (actualSourceSha256 !== sourceSha256) throw new Error(`v0.0.11 worker SHA-256 mismatch: ${actualSourceSha256}`);
@@ -36,5 +37,6 @@ replaceExact(
 
 const out = Buffer.from(source, "utf8");
 const actualSha256 = createHash("sha256").update(out).digest("hex");
+if (actualSha256 !== expectedSha256) throw new Error(`v0.0.12 worker SHA-256 mismatch: ${actualSha256}`);
 await writeFile(worker, out);
 console.log(`Patched BoardVerse v0.0.12 worker.js (${out.length} bytes, SHA-256 ${actualSha256})`);
