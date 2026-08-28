@@ -1,16 +1,16 @@
-name: Simulate BoardVerse v0.0.20 queue and rule details
+name: Verify BoardVerse v0.0.20 queue and rule details
 on:
   push:
     branches: [feature/queue-rules-v0.0.20]
 jobs:
-  simulate:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build v0.0.19
+      - name: Build v0.0.20
         working-directory: BoardVerse
         run: |
           node build-worker.mjs
@@ -25,9 +25,19 @@ jobs:
           node post-build-v017.mjs
           node post-build-v018.mjs
           node post-build-v019.mjs
+          node post-build-v020.mjs
           node --check worker.js
-      - name: Simulate v0.0.20
+      - name: Verify v0.0.20 markers and hash
         working-directory: BoardVerse
         run: |
-          node sim-v020.mjs
-          node --check worker.js
+          node --input-type=module <<'NODE'
+          import { readFile } from 'node:fs/promises';
+          import { createHash } from 'node:crypto';
+          const s=await readFile('worker.js','utf8');
+          const sha=createHash('sha256').update(s).digest('hex');
+          if(s.length!==201387)throw new Error('unexpected bytes '+s.length);
+          if(sha!=='d8da127137b9426f0a3d46baec5697ff9abf6aaf3299f8dfc4df88762dc5ce28')throw new Error('unexpected sha '+sha);
+          for(const marker of ['const APP_VERSION = "0.0.20";','host_stays','房主留桌','hostStays ? !member.isOwner','詳細了解規則設定','buildRuleDetailNode','game-rule-detail','Area 面積計分','Territory 地計分','Komi 7.5','Positional Superko','Capture Go','選項：是 / 否','讓子'])if(!s.includes(marker))throw new Error('missing '+marker);
+          for(const forbidden of ["lab.appendChild(inf);row.appendChild(lab)","rhs.appendChild(inf)"])if(s.includes(forbidden))throw new Error('forbidden '+forbidden);
+          console.log('Verified v0.0.20 '+s.length+' bytes '+sha);
+          NODE
