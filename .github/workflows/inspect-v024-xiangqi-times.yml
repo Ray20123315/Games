@@ -24,25 +24,67 @@ jobs:
           import {createHash} from 'node:crypto';
           const s=await readFile('worker.js','utf8');
           const markers=[
-            'const APP_VERSION = "0.0.24";',
-            'id: "banqi"',
-            'id: "xiangqi_random"',
-            'function newBanqi',
-            'function applyBanqi',
-            'function newRandomXiangqi',
-            'out?.type === "banqi"',
-            'action === "flip"',
-            'className=\'board banqi-board\'',
-            '七國象棋（需要 7 人房間）',
-            '廣象戲（完整規則已失傳）',
-            'room.startedAt = Date.now()',
-            'room.endedAt = Date.now()',
-            'startedAt: Number(r.startedAt) || 0',
-            'function roomTimingText',
+            'const APP_VERSION = "0.0.24";', 'id: "banqi"', 'id: "xiangqi_random"',
+            'function newBanqi', 'function applyBanqi', 'function newRandomXiangqi',
+            'out?.type === "banqi"', 'action === "flip"', 'className=\'board banqi-board\'',
+            '七國象棋（需要 7 人房間）', '廣象戲（完整規則已失傳）',
+            'room.startedAt = Date.now()', 'room.endedAt = Date.now()',
+            'startedAt: Number(r.startedAt) || 0', 'function roomTimingText',
             'roomDurationText((end||Date.now())-start)'
           ];
           for(const marker of markers) if(!s.includes(marker)) throw new Error('missing '+marker);
           const bytes=Buffer.byteLength(s), sha=createHash('sha256').update(s).digest('hex');
-          console.log('V024_BYTES='+bytes);
-          console.log('V024_SHA256='+sha);
+          if(bytes!==213974) throw new Error('unexpected bytes '+bytes);
+          if(sha!=='142b490e2184267077e56a177fdf7220e10bc57f7be5ac9ba98e9959c93ed508') throw new Error('unexpected sha '+sha);
+          console.log('Verified simulated v0.0.24 '+bytes+' bytes '+sha);
+          NODE
+      - name: Exercise Banqi and random Xiangqi rules
+        working-directory: BoardVerse
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFile} from 'node:fs/promises';
+          import assert from 'node:assert/strict';
+          let code=await readFile('worker.js','utf8');
+          code=code.replace(/\bexport\s+default\s+/, 'const __defaultExport = ').replace(/\bexport\s+/g, '');
+          globalThis.DurableObject=class {};
+          const t=new Function(code+'\nreturn {newGame,publicGameState,applyBanqi,banqiCanRankCapture,banqiCanMove};')();
+
+          const game=t.newGame('banqi',{});
+          assert.equal(game.type,'banqi');
+          assert.equal(game.board.length,32);
+          assert.equal(game.board.filter(x=>x&&x.p&&x.up===false).length,32);
+          const pub=t.publicGameState(game);
+          assert.equal(pub.board.length,32);
+          assert.ok(pub.board.every(x=>x&&x.up===false&&!Object.prototype.hasOwnProperty.call(x,'p')),'hidden identities leaked');
+
+          const after=t.applyBanqi(game,'P1',{action:'flip',from:0}).game;
+          assert.equal(after.board[0].up,true);
+          assert.ok(after.colors.P1==='R'||after.colors.P1==='B');
+          assert.equal(after.colors.P2,after.colors.P1==='R'?'B':'R');
+          assert.equal(after.turn,'P2');
+          const afterPub=t.publicGameState(after);
+          assert.ok(afterPub.board[0].p,'revealed identity missing');
+          assert.ok(afterPub.board.slice(1).every(x=>!Object.prototype.hasOwnProperty.call(x,'p')),'unrevealed identity leaked after flip');
+
+          assert.equal(t.banqiCanRankCapture('rP','bK'),true,'soldier must capture general');
+          assert.equal(t.banqiCanRankCapture('rK','bP'),false,'general must not capture soldier');
+          assert.equal(t.banqiCanRankCapture('rR','bH'),true);
+          assert.equal(t.banqiCanRankCapture('rH','bR'),false);
+          const cannon={board:Array(32).fill(null),colors:{P1:'R',P2:'B'}};
+          cannon.board[0]={p:'rC',up:true}; cannon.board[1]={p:'rP',up:true}; cannon.board[3]={p:'bK',up:true};
+          assert.equal(t.banqiCanMove(cannon,'P1',0,3),true,'cannon one-screen capture failed');
+          cannon.board[1]=null;
+          assert.equal(t.banqiCanMove(cannon,'P1',0,3),false,'cannon captured without screen');
+
+          const x=t.newGame('xiangqi_random',{});
+          assert.equal(x.type,'xiangqi');
+          assert.equal(x.variant,'random_back_rank');
+          assert.equal(x.board[4],'bK'); assert.equal(x.board[9*9+4],'rK');
+          assert.equal(x.board[3],'bA'); assert.equal(x.board[5],'bA');
+          assert.equal(x.board[9*9+3],'rA'); assert.equal(x.board[9*9+5],'rA');
+          const slots=[0,1,2,6,7,8];
+          for(const c of slots) assert.equal(x.board[c].slice(1),x.board[9*9+c].slice(1),'back ranks are not mirrored');
+          const types=slots.map(c=>x.board[c].slice(1)).sort().join('');
+          assert.equal(types,['R','H','E','E','H','R'].sort().join(''));
+          console.log('Behavioral checks passed');
           NODE
