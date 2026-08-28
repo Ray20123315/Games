@@ -1,4 +1,4 @@
-name: Inspect BoardVerse v0.0.24 room lifecycle
+name: Inspect BoardVerse v0.0.24 lifecycle
 on:
   push:
     branches: [feature/xiangqi-variants-room-times-v0.0.24]
@@ -10,56 +10,18 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build current v0.0.23
+      - name: Build v0.0.23
         working-directory: BoardVerse
         run: |
           node build-worker.mjs
-          node post-build-v009.mjs
-          node post-build-v010.mjs
-          node post-build-v011.mjs
-          node post-build-v012.mjs
-          node post-build-v013.mjs
-          node post-build-v014.mjs
-          node post-build-v015.mjs
-          node post-build-v016.mjs
-          node post-build-v017.mjs
-          node post-build-v018.mjs
-          node post-build-v019.mjs
-          node post-build-v020.mjs
-          node post-build-v021.mjs
-          node post-build-v022.mjs
-          node post-build-v023.mjs
+          for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023; do node post-build-v${v}.mjs; done
           node --check worker.js
-      - name: Inspect room lifecycle
+      - name: Extract lifecycle snippets
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
           const s=await readFile('worker.js','utf8');
-          const needles=[
-            'lobby/register',
-            'lobby/list',
-            'lobbyEntry',
-            'publicLobby',
-            'this.room = {',
-            'createdAt: Date.now()',
-            'createdAt: now',
-            'status: "waiting"',
-            'status = "playing"',
-            'room.status = "playing"',
-            'startMatch(',
-            'beginMatch(',
-            'currentReplay =',
-            'seats[1]',
-            'room.seats.every',
-            'room.seats.filter(Boolean)',
-            'players: room.seats',
-            'function roomSummary',
-            'function publicRoom',
-            'async fetch(request)'
-          ];
-          for(const needle of needles){
-            let pos=0,count=0;
-            while((pos=s.indexOf(needle,pos))>=0 && count<4){console.log('\n### '+needle+' #'+count+' @ '+pos);console.log(s.slice(Math.max(0,pos-2200),pos+7200));pos+=needle.length;count++}
-          }
+          const needles=['const GAME_CATALOG','const SIDE_MAP','function createGame','function publicGameState','function applyMove','this.room={','this.room = {','seats:[','seats: [','this.room.status="playing"','this.room.status = "playing"','status:"playing"','status: "playing"','/lobby/register','/lobby/list','function publicRoomState','function renderPublicRooms'];
+          for(const n of needles){let p=s.indexOf(n);console.log('\n@@ '+n+' '+p);if(p>=0)console.log(s.slice(Math.max(0,p-900),p+2600).replace(/\n/g,'\\n'));}
           NODE
