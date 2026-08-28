@@ -4,7 +4,7 @@
   "main": "worker.js",
   "compatibility_date": "2026-08-28",
   "build": {
-    "command": "node build-worker.mjs && node post-build-v009.mjs && node post-build-v010.mjs && node post-build-v011.mjs && node post-build-v012.mjs && node post-build-v013.mjs && node post-build-v014.mjs && node post-build-v015.mjs && node post-build-v016.mjs && node post-build-v017.mjs && node post-build-v018.mjs && node post-build-v019.mjs && node post-build-v020.mjs"
+    "command": "node build-worker.mjs && node post-build-v009.mjs && node post-build-v010.mjs && node post-build-v011.mjs && node post-build-v012.mjs && node post-build-v013.mjs && node post-build-v014.mjs && node post-build-v015.mjs && node post-build-v016.mjs && node post-build-v017.mjs && node post-build-v018.mjs && node post-build-v019.mjs && node post-build-v020.mjs && node post-build-v021.mjs"
   },
   "routes": [
     {
