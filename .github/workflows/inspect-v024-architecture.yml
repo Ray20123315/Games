@@ -30,22 +30,12 @@ jobs:
           node post-build-v022.mjs
           node post-build-v023.mjs
           node --check worker.js
-      - name: Inspect exact markers
+      - name: Inspect lifecycle methods
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
           const s=await readFile('worker.js','utf8');
-          const needles=[
-            'const GAME_CATALOG =', 'const RULE_DEFS =', 'function normalizeRules(', 'function rulesSummary(',
-            '<select id="gameId">', '<section class="status-card card">',
-            'var GAMES=', 'var RULES=', 'function renderRuleFields(', 'function formRules(',
-            'function renderPublicRooms(', 'function sideName(', 'function renderPlayers(', 'function renderStatus(',
-            'function intrinsicBoardSize(', 'function renderGameBoard(', 'function renderXiangqi(', 'function boardClick('
-          ];
-          for(const needle of needles){
-            const i=s.indexOf(needle);
-            console.log('\n### '+needle+' @ '+i);
-            if(i>=0)console.log(s.slice(Math.max(0,i-1200),Math.min(s.length,i+12000)));
-          }
+          const needles=['  maybeStartMatch() {','  roomView(token) {','  lobbyRecord() {','  async webSocketMessage(ws, message) {','  async handleMove(token, msg) {','  startReplay() {','function sanitizeReplayMove(','function buildReplay(','function newGame(','function applyGameAction(','function publicGameState(','function newXiangqi('];
+          for(const needle of needles){const i=s.indexOf(needle);console.log('\n### '+needle+' @ '+i);if(i>=0)console.log(s.slice(i,Math.min(s.length,i+10500)));}
           NODE
