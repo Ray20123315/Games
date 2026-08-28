@@ -1,4 +1,4 @@
-name: Inspect BoardVerse v0.0.24 xiangqi variants
+name: Inspect BoardVerse v0.0.24 room lifecycle
 on:
   push:
     branches: [feature/xiangqi-variants-room-times-v0.0.24]
@@ -30,37 +30,36 @@ jobs:
           node post-build-v022.mjs
           node post-build-v023.mjs
           node --check worker.js
-      - name: Inspect relevant markers
+      - name: Inspect room lifecycle
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
-          import {createHash} from 'node:crypto';
           const s=await readFile('worker.js','utf8');
-          console.log('BYTES='+Buffer.byteLength(s));
-          console.log('SHA='+createHash('sha256').update(s).digest('hex'));
           const needles=[
-            'const APP_VERSION',
-            'const GAME_DEFS',
-            'function createGame',
-            'function makeGame',
-            'function newGame',
-            'function initialXiangqi',
-            'function legalXiangqi',
-            'function applyXiangqi',
-            'type === "xiangqi"',
-            "type==='xiangqi'",
-            'function renderPublicRooms',
-            'publicRooms',
-            'createdAt',
-            'startedAt',
-            'startTime',
-            'status:"waiting"',
-            'gameId',
-            'function gameText',
-            '<select id="gameId"'
+            'lobby/register',
+            'lobby/list',
+            'lobbyEntry',
+            'publicLobby',
+            'this.room = {',
+            'createdAt: Date.now()',
+            'createdAt: now',
+            'status: "waiting"',
+            'status = "playing"',
+            'room.status = "playing"',
+            'startMatch(',
+            'beginMatch(',
+            'currentReplay =',
+            'seats[1]',
+            'room.seats.every',
+            'room.seats.filter(Boolean)',
+            'players: room.seats',
+            'function roomSummary',
+            'function publicRoom',
+            'async fetch(request)'
           ];
           for(const needle of needles){
-            const i=s.indexOf(needle); console.log('\n### '+needle+' @ '+i); if(i>=0)console.log(s.slice(Math.max(0,i-1800),i+6500));
+            let pos=0,count=0;
+            while((pos=s.indexOf(needle,pos))>=0 && count<4){console.log('\n### '+needle+' #'+count+' @ '+pos);console.log(s.slice(Math.max(0,pos-2200),pos+7200));pos+=needle.length;count++}
           }
           NODE
