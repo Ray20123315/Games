@@ -1,4 +1,4 @@
-name: Inspect BoardVerse v0.0.24 lifecycle
+name: Inspect BoardVerse v0.0.24 hooks
 on:
   push:
     branches: [feature/xiangqi-variants-room-times-v0.0.24]
@@ -8,20 +8,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with:
-          node-version: 22
+        with: {node-version: 22}
       - name: Build v0.0.23
         working-directory: BoardVerse
         run: |
           node build-worker.mjs
           for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023; do node post-build-v${v}.mjs; done
-          node --check worker.js
-      - name: Extract lifecycle snippets
+      - name: Extract hooks
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
-          import {readFile} from 'node:fs/promises';
-          const s=await readFile('worker.js','utf8');
-          const needles=['const GAME_CATALOG','const SIDE_MAP','function createGame','function publicGameState','function applyMove','this.room={','this.room = {','seats:[','seats: [','this.room.status="playing"','this.room.status = "playing"','status:"playing"','status: "playing"','/lobby/register','/lobby/list','function publicRoomState','function renderPublicRooms'];
-          for(const n of needles){let p=s.indexOf(n);console.log('\n@@ '+n+' '+p);if(p>=0)console.log(s.slice(Math.max(0,p-900),p+2600).replace(/\n/g,'\\n'));}
+          import {readFile} from 'node:fs/promises';const s=await readFile('worker.js','utf8');
+          const picks=['function newGame','function newXiangqi','function applyXiangqi','function legalXiangqiMove','function normalizeRules','xiangqi: {','lobbyRecord()','async lobbyRecord','maybeStart','startMatch','startGame','beginMatch','beginGame','this.room.seats[1]','room.seats[1]','seats[1]','status = \'playing\'','status=\'playing\'','status: \'playing\'','currentReplay'];
+          for(const n of picks){let p=s.indexOf(n);console.log('\n@@'+n+' '+p);if(p>=0)console.log(s.slice(Math.max(0,p-700),p+4200).replace(/\n/g,'\\n'));}
+          console.log('\n@@ playing server occurrences');let re=/playing/g,m,c=0;while((m=re.exec(s))&&m.index<100000&&c<20){console.log(m.index+' '+s.slice(Math.max(0,m.index-350),m.index+700).replace(/\n/g,'\\n'));c++}
           NODE
