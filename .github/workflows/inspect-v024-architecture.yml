@@ -10,7 +10,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build and simulate v0.0.24
+      - name: Build current worker
         working-directory: BoardVerse
         run: |
           node build-worker.mjs
@@ -29,6 +29,17 @@ jobs:
           node post-build-v021.mjs
           node post-build-v022.mjs
           node post-build-v023.mjs
+      - name: Inspect lobby record
+        working-directory: BoardVerse
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFile} from 'node:fs/promises';
+          const s=await readFile('worker.js','utf8');
+          for(const m of ['  lobbyRecord() {','function sanitizeLobbyRecord(','function publicLobbyRecord(','function makeLobbyRecord(']){const i=s.indexOf(m);console.log('\n### '+m+' @ '+i);if(i>=0)console.log(s.slice(i,Math.min(s.length,i+4500)))}
+          NODE
+      - name: Simulate v0.0.24
+        working-directory: BoardVerse
+        run: |
           node sim-v024-compat.mjs
           node sim-v024.mjs
           node --check worker.js
