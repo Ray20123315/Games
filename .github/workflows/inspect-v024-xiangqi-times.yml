@@ -45,6 +45,7 @@ jobs:
           import {readFile} from 'node:fs/promises';
           import assert from 'node:assert/strict';
           let code=await readFile('worker.js','utf8');
+          code=code.replace(/^import\s+\{\s*DurableObject\s*\}\s+from\s+"cloudflare:workers";\s*/m,'');
           code=code.replace(/\bexport\s+default\s+/, 'const __defaultExport = ').replace(/\bexport\s+/g, '');
           globalThis.DurableObject=class {};
           const t=new Function(code+'\nreturn {newGame,publicGameState,applyBanqi,banqiCanRankCapture,banqiCanMove};')();
