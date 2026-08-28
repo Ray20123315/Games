@@ -1,9 +1,9 @@
-name: Inspect BoardVerse v0.0.20 theme placement
+name: Verify BoardVerse v0.0.20 theme placement
 on:
   push:
     branches: [feature/queue-rules-v0.0.20]
 jobs:
-  inspect:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -26,22 +26,27 @@ jobs:
           node post-build-v018.mjs
           node post-build-v019.mjs
           node post-build-v020.mjs
+          node sim-v020-theme-position.mjs
           node --check worker.js
-      - name: Inspect language and theme markup
+      - name: Verify placement and print hash
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import { readFile } from 'node:fs/promises';
+          import { createHash } from 'node:crypto';
           const s=await readFile('worker.js','utf8');
-          for(const needle of ['languageSelect','pageThemeChoice','board-bg-setting theme-setting','pageBgBlack','pageBgWhite']){
-            let start=0,count=0;
-            while(true){
-              const i=s.indexOf(needle,start);
-              if(i<0||count>=4)break;
-              console.log('\n### '+needle+' @ '+i+' #'+count);
-              console.log(s.slice(Math.max(0,i-700),i+1800));
-              start=i+needle.length;
-              count++;
-            }
-          }
+          const bytes=Buffer.byteLength(s);
+          const sha=createHash('sha256').update(s).digest('hex');
+          const language=s.indexOf('id="languageSelect"');
+          const theme=s.indexOf('id="pageThemeChoice"');
+          const sound=s.indexOf('class="sound-wrap"');
+          if(language<0||theme<0||sound<0)throw new Error('topbar controls missing');
+          if(!(language < theme && theme < sound && theme-language < 900))throw new Error('theme is not beside language');
+          if((s.match(/id="pageThemeChoice"/g)||[]).length!==1)throw new Error('theme control duplicated');
+          if((s.match(/id="pageBgBlack"/g)||[]).length!==1||(s.match(/id="pageBgWhite"/g)||[]).length!==1)throw new Error('theme buttons duplicated');
+          if(s.includes('board-bg-setting theme-setting'))throw new Error('old status-card theme control remains');
+          if(!s.includes('top-theme-setting'))throw new Error('compact topbar theme CSS missing');
+          console.log('V020_THEME_BYTES='+bytes);
+          console.log('V020_THEME_SHA256='+sha);
+          console.log('Verified page theme beside language');
           NODE
