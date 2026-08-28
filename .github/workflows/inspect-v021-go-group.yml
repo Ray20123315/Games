@@ -1,16 +1,16 @@
-name: Inspect BoardVerse v0.0.21 Go grouping
+name: Verify BoardVerse v0.0.21 Go grouping
 on:
   push:
     branches: [feature/group-go-sizes-v0.0.21]
 jobs:
-  inspect:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build current v0.0.20
+      - name: Build simulated v0.0.21
         working-directory: BoardVerse
         run: |
           node build-worker.mjs
@@ -26,16 +26,19 @@ jobs:
           node post-build-v018.mjs
           node post-build-v019.mjs
           node post-build-v020.mjs
+          node sim-v021.mjs
           node --check worker.js
-      - name: Inspect Go ids and catalog
+      - name: Verify grouping and print hash
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import { readFile } from 'node:fs/promises';
+          import { createHash } from 'node:crypto';
           const s=await readFile('worker.js','utf8');
-          for(const needle of ['圍棋 9×9','围棋 9×9','Go 9×9','function renderGameCatalog','const GAMES','const SERVER_GAMES']){
-            const i=s.indexOf(needle);
-            console.log('\n### '+needle+' @ '+i);
-            if(i>=0)console.log(s.slice(Math.max(0,i-1200),i+4000));
-          }
+          const sha=createHash('sha256').update(s).digest('hex');
+          const bytes=Buffer.byteLength(s);
+          for(const marker of ['const APP_VERSION = "0.0.21";','var goGroup=document.createElement(\'optgroup\')','goGroup.label=lang===\'en\'?\'Go\':lang===\'zh-Hans\'?\'围棋\':\'圍棋\'','id===\'go9\'?\'9×9\'','id===\'go13\'?\'13×13\'','id===\'go19\'?\'19×19\'','goGroup.appendChild(o)'])if(!s.includes(marker))throw new Error('missing '+marker);
+          if((s.match(/goGroup\.appendChild\(o\)/g)||[]).length!==1)throw new Error('unexpected Go grouping wiring');
+          console.log('V021_BYTES='+bytes);
+          console.log('V021_SHA256='+sha);
           NODE
