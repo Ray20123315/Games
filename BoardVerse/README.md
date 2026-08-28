@@ -1,8 +1,12 @@
 # BoardVerse
 
-BoardVerse v0.0.11 是 Cloudflare Worker + Durable Object 的多人棋室。
+BoardVerse v0.0.12 是 Cloudflare Worker + Durable Object 的多人棋室。
 
 本版重點：
+- 補齊五子棋／Renju／Connect6 棋盤填滿且無勝方時的和棋終止條件，避免對局卡在無可落子但仍為 playing 的狀態。
+- `pass` 由伺服器再次限制為圍棋 9×9／13×13／19×19；其他棋類即使偽造 WebSocket 訊息也不能虛手。
+- 玩家主動認輸由 Durable Object 驗證仍在玩家席位，並完整寫入勝者／敗者 member id、名稱與 side，讓結束狀態、回放摘要與另一端顯示一致。
+- 西洋棋建立新局時把初始局面加入 repetition history，三次重複判和會正確把起始局面計入。
 - 象棋棋子尺寸改為跟棋盤容器寬度連動：點位約使用棋盤寬度的 8.6%，最大 48px；棋子本體放大到點位的 94%，並保持正圓。
 - 象棋文字尺寸改用 container query units，避免手機／桌面因 viewport 不同導致棋子文字過小或過大。
 - 圍棋／五子棋／Renju 的落子點會依棋盤路數分級：9×9 最大、13×13 次之、15×15 再縮小、19×19 最小，不再所有棋盤共用同一尺寸。
@@ -23,8 +27,10 @@ Root directory：`BoardVerse`
 npx wrangler@latest deploy
 ```
 
-`wrangler.jsonc` 的 custom build 依序執行 deterministic build/patch，最後強制驗證完整 `worker.js` SHA-256：
+`wrangler.jsonc` 的 custom build 依序執行 deterministic build/patch。v0.0.11 層仍強制驗證完整 `worker.js` SHA-256：
 
 `541ff63d982204bdc27256ed3f7f7788dd5a412551923c5476cea05645a19aa3`
+
+v0.0.12 的 `post-build-v012.mjs` 以此 SHA 作為 source guard，所有 patch marker 都要求只命中一次，並在完成後輸出新的完整 `worker.js` SHA-256。
 
 Durable Object：`ROOMS → GameRoom`，SQLite storage。
