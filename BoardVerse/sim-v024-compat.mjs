@@ -30,4 +30,9 @@ replacePatch(
   'room view patch'
 );
 
+const replayStrict = "replaceCount('initialGame:publicGameState(room.game)', 'initialGame:structuredClone(room.game)', 1, 'startReplay hidden-state source');";
+const replayFlexible = "if (source.includes('initialGame:publicGameState(room.game)')) source = source.split('initialGame:publicGameState(room.game)').join('initialGame:structuredClone(room.game)');";
+if(!s.includes(replayStrict)) throw new Error('compat replay source marker missing');
+s=s.replace(replayStrict,replayFlexible);
+
 await writeFile(file, s, "utf8");
