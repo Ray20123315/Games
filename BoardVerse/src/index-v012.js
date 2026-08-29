@@ -4,9 +4,8 @@ import { assertOwner } from "./room/roles.js";
 import { cancelDeadline } from "./room/deadline-scheduler.js";
 import { parseWsMessage } from "./protocol/messages.js";
 import { ROOM_CODE_RE } from "./core/config.js";
-import { audit } from "./core/db.js";
+import { audit, withDatabaseEnv } from "./core/db.js";
 import { errorJson, json, toErrorResponse } from "./core/http.js";
-import { withDatabaseEnv } from "./core/db.js";
 import { requireAdmin } from "./admin/auth.js";
 
 export { BoardVerseDb, BoardVerseDbV011, GameRoomV011, GlobalChat, GlobalChatV011 } from "./index-v011.js";
@@ -330,10 +329,7 @@ export default {
     const originalUrl = new URL(request.url);
     if (originalUrl.pathname === "/admin/api/rooms/announcement" && request.method === "POST") {
       try { return await adminRoomAnnouncement(request, env); }
-      catch (error) {
-        if (error?.status === 401) return new Response(null, { status: 302, headers: { location: "/admin/login" } });
-        return toErrorResponse(error);
-      }
+      catch (error) { return toErrorResponse(error); }
     }
 
     let routedRequest = request;
