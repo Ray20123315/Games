@@ -38,9 +38,6 @@ jobs:
             exit 0
           fi
 
-          # Rebuild exclusively from small blobs whose Git blob SHAs were
-          # verified against the local source payload. Do not use the original
-          # connector-truncated file at all.
           REBUILT='/tmp/boardverse-v010-source.tar.gz.b64'
           : > "$REBUILT"
           for n in 001 002 003 004; do
@@ -58,7 +55,6 @@ jobs:
           done
           test "$(wc -c < "$REBUILT")" -eq 83212
           echo '0b28608a96ce144e28a794e1a6467dad810287fc4812192b6cc8fd8bf9cd88da  /tmp/boardverse-v010-source.tar.gz.b64' | sha256sum -c -
-
           base64 -d "$REBUILT" > /tmp/boardverse-v010-source.tar.gz
           echo '9be8345385a8431b3f73903fba65fa224468b1766cbf53f91d8d8f52d2f47591  /tmp/boardverse-v010-source.tar.gz' | sha256sum -c -
           tar -tzf /tmp/boardverse-v010-source.tar.gz >/dev/null
@@ -111,15 +107,37 @@ jobs:
           echo '8f168113e24472377fec462bf61812e0b765a3707f72f7f6b249a6997e4a23e5  src/legacy/runtime-v023.js' | sha256sum -c -
 
       - name: Wrangler bundle dry-run
+        id: wrangler
+        continue-on-error: true
         working-directory: BoardVerse
-        run: npx wrangler deploy --dry-run --outdir dist --config wrangler.jsonc
+        shell: bash
+        run: |
+          set -o pipefail
+          npx wrangler deploy --dry-run --outdir dist --config wrangler.jsonc 2>&1 | tee /tmp/boardverse-wrangler.log
+
+      - name: Persist Wrangler diagnostic on failure
+        if: steps.wrangler.outcome == 'failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp /tmp/boardverse-wrangler.log BoardVerse/.wrangler-dryrun-error.txt
+          rm -rf BoardVerse/node_modules BoardVerse/dist BoardVerse/.wrangler BoardVerse/package-lock.json
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add BoardVerse/.wrangler-dryrun-error.txt
+          if ! git diff --cached --quiet; then
+            git commit -m 'CI: capture BoardVerse Wrangler dry-run error'
+            git push origin HEAD:boardverse-v010-final
+          fi
+          exit 1
 
       - name: Clean generated files
+        if: steps.wrangler.outcome == 'success'
         shell: bash
-        run: rm -rf BoardVerse/node_modules BoardVerse/dist BoardVerse/.wrangler BoardVerse/package-lock.json
+        run: rm -rf BoardVerse/node_modules BoardVerse/dist BoardVerse/.wrangler BoardVerse/package-lock.json BoardVerse/.wrangler-dryrun-error.txt
 
       - name: Commit verified source-only candidate
-        if: steps.migrate.outputs.migrated == '1'
+        if: steps.migrate.outputs.migrated == '1' && steps.wrangler.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
