@@ -1,95 +1,60 @@
-name: Test v0.0.26 Seven Kingdoms simulation
+name: Finalize v0.0.26 Seven Kingdoms
 on:
   push:
     branches: [feature/qiguo-xiangqi-v0.0.26]
+permissions:
+  contents: write
 jobs:
-  test:
+  finalize:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build through v0.0.25 and simulate v0.0.26
+      - name: Create formal deterministic patch
+        run: |
+          cp BoardVerse/simulate-v026.mjs BoardVerse/post-build-v026.mjs
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('BoardVerse/post-build-v026.mjs')
+          s=p.read_text()
+          needle='await writeFile(worker,source,"utf8");'
+          guard='const expectedOutputHash = "99034cdba2d1b72473ef50fc5ad0b190f007cb4638d40dddd7ce8959a9606fd0";\nif (outHash !== expectedOutputHash) throw new Error(`v0.0.26 output hash mismatch: ${outHash}`);\n'
+          if needle not in s: raise SystemExit('write marker missing')
+          s=s.replace(needle,guard+needle,1)
+          p.write_text(s)
+          w=Path('BoardVerse/wrangler.jsonc')
+          t=w.read_text()
+          old='&& node post-build-v025.mjs"'
+          new='&& node post-build-v025.mjs && node post-build-v026.mjs"'
+          if old not in t: raise SystemExit('wrangler v025 tail missing')
+          w.write_text(t.replace(old,new,1))
+          PY
+      - name: Verify formal build and exact output
         working-directory: BoardVerse
         run: |
+          rm -f worker.js
           node build-worker.mjs
-          for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025; do node post-build-v${v}.mjs; done
-          node simulate-v026.mjs
+          for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025 026; do node post-build-v${v}.mjs; done
           node --check worker.js
-      - name: Verify Seven Kingdoms markers and invariants
+          test "$(wc -c < worker.js)" = "250901"
+          test "$(sha256sum worker.js | cut -d' ' -f1)" = "99034cdba2d1b72473ef50fc5ad0b190f007cb4638d40dddd7ce8959a9606fd0"
+          grep -q 'const APP_VERSION = "0.0.26";' worker.js
+          grep -q 'const QIGUO_ORDER = \["qin","han","chu","wei","qi","yan","zhao"\]' worker.js
+      - name: Verify Cloudflare deploy path
         working-directory: BoardVerse
+        run: npx --yes wrangler@4.127.1 deploy --dry-run
+      - name: Commit only production files
         run: |
-          node --input-type=module <<'NODE'
-          import {readFile} from 'node:fs/promises';
-          import {createHash} from 'node:crypto';
-          const s=await readFile('worker.js','utf8');
-          const must=[
-            'const APP_VERSION = "0.0.26";','GAME_CATALOG.qiguo','RULE_DEFS.qiguo','playerCount:7,drawMode:"country"',
-            'const QIGUO_ORDER = ["qin","han","chu","wei","qi","yan","zhao"]','qin:"秦",han:"韓",chu:"楚",wei:"魏",qi:"齊",yan:"燕",zhao:"趙"',
-            'function newQiguo(', 'function applyQiguo(', 'function qiguoGroups(', 'mode:"qiguo_number"', 'mode:"qiguo_country"',
-            'msg.type === "qiguo_choose"', 'async handleQiguoChoose(', 'room.gameId === "qiguo"', 'gameCapacity(room.gameId',
-            'renderQiguo(g,el,interactive)', 'qiguo-piece','秦 → 韓 → 楚 → 魏 → 齊 → 燕 → 趙','擒得二將，稱霸','累計吃滿 30 子，稱霸'
-          ];
-          for(const m of must) if(!s.includes(m)) throw new Error('missing '+m);
-          if(!s.includes('capacity=gameCapacity(room.gameId,room.rules||{})')) throw new Error('dynamic room capacity missing');
-          if(!s.includes('settings.queueEnabled=false')) throw new Error('qiguo queue must be disabled');
-          if(!s.includes('QIGUO_START')) throw new Error('initial layout missing');
-          if(!s.includes('this.recordReplayAction({...auth.member,side:country},msg,"move")')) throw new Error('qiguo replay action side missing');
-          if(!s.includes('if (game.type === "qiguo") return applyQiguo(game, side, msg);')) throw new Error('qiguo replay/apply route missing');
-          const pos=s.match(/qin:\[\[6,0\][\s\S]*?zhao:\[\[0,2\][\s\S]*?\],\n\};/);
-          if(!pos) throw new Error('7-5-3-1-1 layout block missing');
-          console.log('V026_FINAL_BYTES='+Buffer.byteLength(s));
-          console.log('V026_FINAL_SHA256='+createHash('sha256').update(s).digest('hex'));
-          NODE
-      - name: Exercise Seven Kingdoms engine behavior
-        working-directory: BoardVerse
-        run: |
-          node --input-type=module <<'NODE'
-          import {readFile} from 'node:fs/promises';
-          import vm from 'node:vm';
-          const s=await readFile('worker.js','utf8');
-          const a=s.indexOf('const QIGUO_ORDER =');
-          const b=s.indexOf('function newBanqi(',a);
-          if(a<0||b<0) throw new Error('qiguo engine segment not found');
-          const segment=s.slice(a,b);
-          const context={structuredClone,crypto:globalThis.crypto,console};
-          vm.createContext(context);
-          vm.runInContext('function secureShuffle(v){return v.slice();}\n'+segment+'\nglobalThis.q={QIGUO_ORDER,QIGUO_START,newQiguo,qiguoGroups,qiguoParse,qiguoLegalMove,qiguoNextTurn,applyQiguo};',context);
-          const q=context.q;
-          function ok(v,m){if(!v)throw new Error(m)}
-          function eq(a,b,m){if(JSON.stringify(a)!==JSON.stringify(b))throw new Error(m+' got '+JSON.stringify(a)+' expected '+JSON.stringify(b))}
-          const initial=q.newQiguo({playerCount:7});
-          eq(initial.board.filter(Boolean).length,120,'initial board piece count');
-          ok(initial.board[9*19+9]==='zhou:Z','zhou must occupy tengen');
-          eq(initial.turn,'qin','Qin must move first');
-          for(const c of q.QIGUO_ORDER){
-            const pieces=initial.board.filter(x=>q.qiguoParse(x)?.country===c);
-            eq(pieces.length,17,c+' must have 17 pieces');
-            eq(pieces.filter(x=>q.qiguoParse(x).type==='J').length,1,c+' must have one king/general');
-          }
-          const expectedSizes={3:[3,2,2],4:[2,2,2,1],5:[2,2,1,1,1],6:[2,1,1,1,1,1],7:[1,1,1,1,1,1,1]};
-          for(let n=3;n<=7;n++){
-            const groups=q.qiguoGroups(n),flat=groups.flat();
-            eq(groups.length,n,n+' player group count');
-            eq([...flat].sort(),[...q.QIGUO_ORDER].sort(),n+' player groups must cover all kingdoms exactly once');
-            eq(groups.map(x=>x.length).sort((a,b)=>b-a),expectedSizes[n],n+' alliance sizes');
-          }
-          const six=q.qiguoGroups(6);ok(six.find(g=>g.includes('qin')).length===2,'six-player Qin alliance');ok(!six.find(g=>g.includes('qin')).includes('chu'),'Qin must not ally Chu in six-player setup');
-          function empty(){const g=q.newQiguo({});g.board=Array(361).fill(null);g.board[180]='zhou:Z';g.controllerByCountry={qin:'A',han:'B',chu:'C',wei:'D',qi:'E',yan:'F',zhao:'G'};g.captures={qin:0,han:0,chu:0,wei:0,qi:0,yan:0,zhao:0};g.losses={qin:0,han:0,chu:0,wei:0,qi:0,yan:0,zhao:0};g.generalsCaptured={qin:0,han:0,chu:0,wei:0,qi:0,yan:0,zhao:0};g.eliminated={};g.turn='qin';g.ended=false;return g}
-          let g=empty();for(const [i,c] of q.QIGUO_ORDER.entries())g.board[250+i]=c+':S';
-          eq(q.qiguoNextTurn(g,'qin'),'han','turn Qin->Han');eq(q.qiguoNextTurn(g,'han'),'chu','turn Han->Chu');eq(q.qiguoNextTurn(g,'chu'),'wei','turn Chu->Wei');eq(q.qiguoNextTurn(g,'wei'),'qi','turn Wei->Qi');eq(q.qiguoNextTurn(g,'qi'),'yan','turn Qi->Yan');eq(q.qiguoNextTurn(g,'yan'),'zhao','turn Yan->Zhao');eq(q.qiguoNextTurn(g,'zhao'),'qin','turn Zhao->Qin');
-          function legal(type,from,to,target=null){const x=empty();x.board[from]='qin:'+type;if(target)x.board[to]=target;return q.qiguoLegalMove(x,'qin',from,to)}
-          ok(legal('J',0,60),'king queen-like diagonal');ok(legal('P',0,3),'pian rook-like');ok(legal('B',0,60),'bi bishop-like');
-          ok(legal('G',0,76),'archer four lines');ok(!legal('G',0,57),'archer must be four');ok(legal('N',0,95),'crossbow five lines');
-          ok(legal('D',0,20),'dagger diagonal one');ok(!legal('D',0,1),'dagger not orthogonal');ok(legal('S',0,1),'sword orthogonal one');
-          ok(legal('H',0,79),'cavalry 4x3 long knight');
-          ok(!legal('M',0,1,'han:S'),'envoy cannot capture');ok(!legal('J',0,1,'han:M'),'envoy cannot be captured');
-          let cannon=empty();cannon.board[0]='qin:C';cannon.board[1]='chu:S';cannon.board[2]='han:S';ok(q.qiguoLegalMove(cannon,'qin',0,2),'cannon captures over one screen');cannon.board[1]=null;ok(!q.qiguoLegalMove(cannon,'qin',0,2),'cannon capture requires one screen');
-          let z=empty();z.board[9*19+8]='qin:J';ok(!q.qiguoLegalMove(z,'qin',9*19+8,9*19+10),'Zhou blocks long mover');ok(!q.qiguoLegalMove(z,'qin',9*19+8,180),'Zhou point cannot be entered');
-          let cap=empty();for(const [i,c] of q.QIGUO_ORDER.entries())cap.board[300+i]=c+':S';cap.board[0]='qin:J';cap.board[1]='han:J';let r=q.applyQiguo(cap,'qin',{from:0,to:1});ok(!r.ended,'one general capture should not dominate');eq(r.game.generalsCaptured.qin,1,'general capture counter');eq(r.game.controllerByCountry.han,'A','captured kingdom must be taken over');eq(r.game.turn,'han','conquered Han turn remains in fixed country order');
-          let ten=empty();for(const [i,c] of q.QIGUO_ORDER.entries())ten.board[310+i]=c+':S';ten.losses.han=9;ten.board[0]='qin:S';ten.board[1]='han:S';r=q.applyQiguo(ten,'qin',{from:0,to:1});eq(r.game.losses.han,10,'ten-loss threshold');eq(r.game.controllerByCountry.han,'A','ten-loss kingdom takeover');
-          let two=empty();for(const [i,c] of q.QIGUO_ORDER.entries())two.board[320+i]=c+':S';two.generalsCaptured.qin=1;two.board[0]='qin:J';two.board[1]='han:J';r=q.applyQiguo(two,'qin',{from:0,to:1});ok(r.ended,'two generals must dominate');eq(r.result.winnerMemberId,'A','two-general winner');
-          let thirty=empty();for(const [i,c] of q.QIGUO_ORDER.entries())thirty.board[330+i]=c+':S';thirty.captures.qin=29;thirty.board[0]='qin:S';thirty.board[1]='han:S';r=q.applyQiguo(thirty,'qin',{from:0,to:1});ok(r.ended,'30 captures must dominate');eq(r.result.winnerMemberId,'A','30-capture winner');
-          console.log('QIGUO_ENGINE_TESTS=PASS');
-          NODE
+          rm -f BoardVerse/worker.js BoardVerse/simulate-v026.mjs .github/workflows/inspect-v026-qiguo.yml
+          git config user.name "raychen"
+          git config user.email "150588882+Ray20123315@users.noreply.github.com"
+          git add -A
+          git status --short
+          test "$(git diff --cached --name-only | wc -l)" = "3"
+          git diff --cached --name-only | grep -qx 'BoardVerse/post-build-v026.mjs'
+          git diff --cached --name-only | grep -qx 'BoardVerse/wrangler.jsonc'
+          git diff --cached --name-only | grep -qx '.github/workflows/inspect-v026-qiguo.yml'
+          git commit -m "BoardVerse v0.0.26: add Seven Kingdoms Chess"
+          git push origin HEAD:feature/qiguo-xiangqi-v0.0.26
