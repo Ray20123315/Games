@@ -1,0 +1,28 @@
+name: BoardVerse production domain route verification
+
+on:
+  push:
+    branches: [boardverse-finish-visible-deploy-v011]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        working-directory: BoardVerse
+        run: npm install --no-audit --no-fund
+      - name: Full regression suite
+        working-directory: BoardVerse
+        run: npm test
+      - name: Production route dry-run
+        run: npx --yes wrangler@4.127.1 deploy --dry-run --config wrangler.jsonc --outdir /tmp/boardverse-domain
+      - name: Assert custom domain
+        run: |
+          grep -q 'xn--gmqt6w03b11v.ray2025.com' wrangler.jsonc
+          grep -q '"custom_domain": true' wrangler.jsonc
+          grep -q 'xn--gmqt6w03b11v.ray2025.com' scripts/wrangler-ci.cjs
