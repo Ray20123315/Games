@@ -37,11 +37,24 @@ jobs:
             echo 'migrated=0' >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          wc -c "$PAYLOAD"
-          grep -abo '<SECRET>' "$PAYLOAD" || true
-          sha256sum "$PAYLOAD"
-          base64 -d "$PAYLOAD" > /tmp/boardverse-v010-source.tar.gz
+
+          # The original connector write was truncated after the first 16,121
+          # correct bytes and replaced the remainder with <SECRET>. Rebuild it
+          # only from the verified prefix plus seven separately uploaded chunks.
+          PREFIX_BYTES=16121
+          REBUILT='/tmp/boardverse-v010-source.tar.gz.b64'
+          head -c "$PREFIX_BYTES" "$PAYLOAD" > "$REBUILT"
+          for n in 001 002 003 004 005 006 007; do
+            PART="BoardVerse/.migration/v010-source-tail.${n}.b64"
+            test -f "$PART"
+            cat "$PART" >> "$REBUILT"
+          done
+          test "$(wc -c < "$REBUILT")" -eq 83212
+          echo '0b28608a96ce144e28a794e1a6467dad810287fc4812192b6cc8fd8bf9cd88da  /tmp/boardverse-v010-source.tar.gz.b64' | sha256sum -c -
+
+          base64 -d "$REBUILT" > /tmp/boardverse-v010-source.tar.gz
           echo '9be8345385a8431b3f73903fba65fa224468b1766cbf53f91d8d8f52d2f47591  /tmp/boardverse-v010-source.tar.gz' | sha256sum -c -
+          tar -tzf /tmp/boardverse-v010-source.tar.gz >/dev/null
           tar -xzf /tmp/boardverse-v010-source.tar.gz
 
           mkdir -p BoardVerse/src/legacy
