@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { adminDashboardPage } from "../src/admin/pages.js";
 import { ADMIN_WORKBENCH_STYLE } from "../src/admin/workbench.js";
 
-const html=adminDashboardPage();
+const html=await adminDashboardPage().text();
 const nav=["帳號","房間","Replay","回報","Risk Flags","公告","Global Chat","Audit Log"];
 let pos=-1;
 for(const label of nav){const next=html.indexOf(`>${label}</button>`,pos+1);assert.ok(next>pos,`nav order: ${label}`);pos=next;}
