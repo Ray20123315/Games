@@ -1,0 +1,8 @@
+{
+  "name": "boardverse-cloudflare-ci",
+  "private": true,
+  "version": "0.1.1",
+  "bin": {
+    "wrangler": "scripts/wrangler-ci.cjs"
+  }
+}
