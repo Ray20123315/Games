@@ -1,15 +1,11 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "games",
+  "name": "crimson-haze-0a4d",
   "main": "src/index-v011.js",
   "compatibility_date": "2026-08-28",
   "workers_dev": false,
   "keep_vars": true,
   "routes": [
-    {
-      "pattern": "xn--gmqt6w03b11v.ray2025.com/*",
-      "zone_name": "ray2025.com"
-    },
     {
       "pattern": "xn--gmqt6w03b11v.ray2025.com",
       "custom_domain": true
