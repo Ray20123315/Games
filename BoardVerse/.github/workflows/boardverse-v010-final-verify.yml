@@ -1,0 +1,42 @@
+name: BoardVerse v0.1.0 final verification
+on:
+  push:
+    branches:
+      - boardverse-v010-final
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install
+        working-directory: BoardVerse
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: JavaScript syntax
+        working-directory: BoardVerse
+        run: find src test -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
+      - name: Regression suite
+        working-directory: BoardVerse
+        run: |
+          node test/core.test.mjs
+          node test/imports.test.mjs
+          node test/browser-scripts.test.mjs
+          node test/static.test.mjs
+          node test/legacy-preservation.test.mjs
+          python test/schema_test.py
+      - name: Source authority
+        working-directory: BoardVerse
+        run: |
+          test ! -d .source
+          test ! -d .source-v005
+          test -z "$(find . -maxdepth 1 -name 'post-build-v*.mjs' -print -quit)"
+          ! grep -q 'post-build-v' wrangler.jsonc
+          grep -q '"main": "src/index.js"' wrangler.jsonc
+      - name: Wrangler bundle dry-run
+        working-directory: BoardVerse
+        run: npx wrangler deploy --dry-run --outdir dist --config wrangler.jsonc

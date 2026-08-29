@@ -1,9 +1,0 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { createHash } from "node:crypto";
-const worker=new URL("./worker.js",import.meta.url);let source=await readFile(worker,"utf8");const inputHash=createHash("sha256").update(source).digest("hex");if(inputHash!=="699312a341dcba152118bc8c66cfc4afba1355d121929f9e91948807eb14e7ab")throw new Error(`v0.0.29 source hash mismatch: ${inputHash}`);
-function r(a,b,l){const i=source.indexOf(a);if(i<0)throw new Error(l+" marker not found");if(source.indexOf(a,i+a.length)>=0)throw new Error(l+" marker not unique");source=source.replace(a,b)}
-r('const APP_VERSION = "0.0.28";','const APP_VERSION = "0.0.29";','version');
-r('.btn.secondary{border-color:#4b4030;background:#211c14;color:#e9e0cf}.btn.ghost{border-color:#4b4030;background:transparent;color:#e1d6c3}','.btn.secondary{border-color:var(--line);background:var(--panel2);color:var(--text)}.btn.ghost{border-color:var(--line);background:transparent;color:var(--text)}','theme buttons');
-r('.rule-detail-tab[aria-selected="true"]{background:var(--gold-gradient);color:#1b160d;border-color:#a98546;box-shadow:0 2px 8px rgba(0,0,0,.18)}','.rule-detail-tab[aria-selected="true"]{background:linear-gradient(135deg,#806a3c 0%,#c3a15f 50%,#e7d7a8 100%);color:#211a0f;border-color:#a98546;box-shadow:0 2px 8px rgba(0,0,0,.18)}','selected tab');
-r('.rule-detail-tab:hover{color:var(--text);border-color:var(--line)}','.rule-detail-tab:hover{color:var(--text);border-color:var(--line)}body.page-theme-white .game-rule-detail{color:#3f3527;border-color:#9f9077;background:#fffdf8}body.page-theme-white .game-rule-detail:hover{color:#211a0f;border-color:#806a3c;background:#f5efe3}','white detail button');
-const out=Buffer.from(source,'utf8');await writeFile(worker,out);console.log('V029_BYTES='+out.length);console.log('V029_SHA256='+createHash('sha256').update(out).digest('hex'));
