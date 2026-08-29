@@ -39,8 +39,11 @@ if (pages) {
 }
 if (adminPages) {
   assert.match(adminPages, /boardverseLang/);
-  assert.match(adminPages, /'帳號等級','账号等级','Account level'/);
-  assert.match(adminPages, /'全域設定','全局设置','Global settings'/);
+  assert.match(adminPages, /'使用者','用户','Users'/);
+  assert.match(adminPages, /'房間','房间','Rooms'/);
+  assert.match(adminPages, /'回放','回放','Replays'/);
+  assert.match(adminPages, /'系統設定','系统设置','System settings'/);
   assert.match(adminPages, /'稽核記錄','审计记录','Audit log'/);
+  assert.match(adminPages, /'使用者名稱','用户名','Username'/);
 }
 console.log("i18n.test: PASS (zh-Hant, zh-Hans, en)");
