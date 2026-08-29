@@ -38,13 +38,13 @@ jobs:
             exit 0
           fi
 
-          # The original connector write was truncated after the first 16,121
-          # correct bytes and replaced the remainder with <SECRET>. Rebuild it
-          # only from the verified prefix plus seven separately uploaded chunks.
           PREFIX_BYTES=16121
           REBUILT='/tmp/boardverse-v010-source.tar.gz.b64'
           head -c "$PREFIX_BYTES" "$PAYLOAD" > "$REBUILT"
-          for n in 001 002 003 004 005 006 007; do
+          cat BoardVerse/.migration/v010-source-tail.001.b64 >> "$REBUILT"
+          cat BoardVerse/.migration/v010-source-tail.002a.b64 >> "$REBUILT"
+          cat BoardVerse/.migration/v010-source-tail.002b.b64 >> "$REBUILT"
+          for n in 003 004 005 006 007; do
             PART="BoardVerse/.migration/v010-source-tail.${n}.b64"
             test -f "$PART"
             cat "$PART" >> "$REBUILT"
