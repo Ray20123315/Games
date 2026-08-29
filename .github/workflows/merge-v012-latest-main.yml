@@ -26,16 +26,17 @@ jobs:
           code=$?
           set -e
           if [ "$code" -ne 0 ]; then
+            git checkout --ours BoardVerse/package.json
             git checkout --theirs BoardVerse/src/admin/api.js
             git checkout --ours BoardVerse/src/admin/pages.js
             git checkout --ours BoardVerse/src/index-v011.js
             git checkout --theirs BoardVerse/src/ui/feature-policy.js
             git checkout --theirs BoardVerse/test/feature-policy.test.mjs
             git checkout --ours BoardVerse/test/i18n.test.mjs
-            git add BoardVerse/src/admin/api.js BoardVerse/src/admin/pages.js BoardVerse/src/index-v011.js BoardVerse/src/ui/feature-policy.js BoardVerse/test/feature-policy.test.mjs BoardVerse/test/i18n.test.mjs
+            git add BoardVerse/package.json BoardVerse/src/admin/api.js BoardVerse/src/admin/pages.js BoardVerse/src/index-v011.js BoardVerse/src/ui/feature-policy.js BoardVerse/test/feature-policy.test.mjs BoardVerse/test/i18n.test.mjs
           fi
           cd BoardVerse
-          node tools/merge-v012-main.mjs
+          node tools/merge-v012-main2.mjs
           cd ..
           git add BoardVerse
           if git diff --name-only --diff-filter=U | grep .; then
