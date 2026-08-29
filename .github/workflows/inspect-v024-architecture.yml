@@ -29,23 +29,17 @@ jobs:
           node post-build-v021.mjs
           node post-build-v022.mjs
           node post-build-v023.mjs
-      - name: Inspect pass resign and finish handlers
-        working-directory: BoardVerse
-        run: |
-          node --input-type=module <<'NODE'
-          import {readFile} from 'node:fs/promises';
-          const s=await readFile('worker.js','utf8');
-          for(const term of ['msg.type === "pass"','msg.type === "resign"','type === "pass"','type === "resign"','finishMatch(','handlePass','handleResign']){
-            let at=0,n=0; while((at=s.indexOf(term,at))>=0&&n<5){console.log('\n### '+term+' @ '+at);console.log(s.slice(Math.max(0,at-1600),Math.min(s.length,at+5200)));at+=term.length;n++;}
-            if(!n)console.log('\n### '+term+' @ -1');
-          }
-          NODE
       - name: Simulate v0.0.24
         working-directory: BoardVerse
         run: |
           node sim-v024-compat.mjs
           node sim-v024.mjs
           node --check worker.js
+      - name: Preserve finalized v0.0.24 patch source
+        uses: actions/upload-artifact@v4
+        with:
+          name: v024-finalized-patch-source
+          path: BoardVerse/sim-v024.mjs
       - name: Verify v0.0.24 markers and hidden-state safety
         working-directory: BoardVerse
         run: |
