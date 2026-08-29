@@ -1,7 +1,7 @@
-import appV011, { GameRoom as GameRoomV011 } from "./index-v011.js";
+import appV011, { GameRoom as GameRoomBase } from "./index-v011.js";
 import { ensureFeatureState, appendEvent, resetReady } from "./room/state.js";
 
-export { BoardVerseDb, BoardVerseDbV011, GlobalChat, GlobalChatV011 } from "./index-v011.js";
+export { BoardVerseDb, BoardVerseDbV011, GameRoomV011, GlobalChat, GlobalChatV011 } from "./index-v011.js";
 
 const HOST_KICK_SCRIPT = `<script id="boardverse-host-kick">(function(){
 'use strict';
@@ -71,7 +71,7 @@ function memberById(room, id) {
   return room?.members?.find((member) => member.id === id) || null;
 }
 
-export class GameRoom extends GameRoomV011 {
+export class GameRoom extends GameRoomBase {
   send(ws, message) {
     let next = message;
     if (message?.type === "feature_state" && message.feature) {
