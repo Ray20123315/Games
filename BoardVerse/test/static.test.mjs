@@ -17,6 +17,10 @@ const buildGate=await readFile(new URL("../build-worker.mjs",import.meta.url),"u
 assert.match(buildGate,/full regression suite/);
 assert.match(buildGate,/Wrangler live-worker dry-run/);
 assert.match(buildGate,/targetWorker = "crimson-haze-0a4d"/);
+assert.match(buildGate,/WRANGLER_CI_OVERRIDE_NAME/);
+assert.match(buildGate,/delete deployEnv\.WRANGLER_CI_OVERRIDE_NAME/);
+assert.match(buildGate,/explicit production deploy to/);
+assert.match(buildGate,/preview\/local build: explicit live Worker deploy skipped/);
 assert.match(buildGate,/"npm", \["test"\]/);
 assert.match(buildGate,/"wrangler",\s*"deploy",\s*"--dry-run"/s);
 const entry=await readFile(new URL("../src/index-v011.js",import.meta.url),"utf8"); assert.match(entry,/from "\.\/index\.js"/); assert.match(entry,/\.\/ui\/piece-theme\.js/); assert.match(entry,/hardenPieceThemeHtml/); assert.match(entry,/withDatabaseEnv/); assert.match(entry,/BoardVerseDb/); assert.match(entry,/query\(mode, sql, binds = \[\]\)/);
