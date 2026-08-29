@@ -37,6 +37,8 @@ jobs:
             echo 'migrated=0' >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          wc -c "$PAYLOAD"
+          grep -abo '<SECRET>' "$PAYLOAD" || true
           sha256sum "$PAYLOAD"
           base64 -d "$PAYLOAD" > /tmp/boardverse-v010-source.tar.gz
           echo '9be8345385a8431b3f73903fba65fa224468b1766cbf53f91d8d8f52d2f47591  /tmp/boardverse-v010-source.tar.gz' | sha256sum -c -
