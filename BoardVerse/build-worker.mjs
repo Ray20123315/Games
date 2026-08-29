@@ -1,9 +1,11 @@
 import { spawnSync } from "node:child_process";
+import { installWranglerCiWrapper, hasWranglerCiWrapper } from "./scripts/wrangler-ci-wrapper.mjs";
 
 const branch = process.env.WORKERS_CI_BRANCH || "local";
 const isWorkersBuild = Boolean(process.env.WORKERS_CI);
 const isProduction = isWorkersBuild && branch === "main";
 const targetWorker = "crimson-haze-0a4d";
+const connectedWorkerOverride = process.env.WRANGLER_CI_OVERRIDE_NAME || "(none)";
 
 function run(label, command, args, env = process.env) {
   console.log(`[boardverse-build] ${label}`);
@@ -18,9 +20,19 @@ function run(label, command, args, env = process.env) {
   }
 }
 
+if (isWorkersBuild) {
+  installWranglerCiWrapper({ expectedWorker: targetWorker });
+  if (!hasWranglerCiWrapper()) {
+    throw new Error("Workers CI Wrangler wrapper installation verification failed");
+  }
+  console.log(
+    `[boardverse-build] installed CI Wrangler deploy wrapper; deploy ignores connected-worker override=${connectedWorkerOverride} and uses ${targetWorker}`,
+  );
+}
+
 console.log(
   `[boardverse-build] validating BoardVerse v0.1.1; branch=${branch}; production=${isProduction}; ` +
-    `connected-worker-override=${process.env.WRANGLER_CI_OVERRIDE_NAME || "(none)"}; live-target=${targetWorker}`,
+    `connected-worker-override=${connectedWorkerOverride}; live-target=${targetWorker}`,
 );
 run("full regression suite", "npm", ["test"]);
 run("Wrangler live-worker dry-run", "npx", [
@@ -33,20 +45,10 @@ run("Wrangler live-worker dry-run", "npx", [
   "dist",
 ]);
 
-if (!isProduction) {
-  console.log("[boardverse-build] preview/local build: explicit live Worker deploy skipped");
-  process.exit(0);
+if (isProduction) {
+  console.log(
+    `[boardverse-build] production validation complete; Cloudflare Deploy command will perform the single live deploy to ${targetWorker}`,
+  );
+} else {
+  console.log("[boardverse-build] preview/local build validation complete; no live deployment performed by build command");
 }
-
-const deployEnv = { ...process.env };
-delete deployEnv.WRANGLER_CI_OVERRIDE_NAME;
-console.log(
-  `[boardverse-build] production build: removed WRANGLER_CI_OVERRIDE_NAME and explicitly deploying ${targetWorker}`,
-);
-run(
-  `explicit production deploy to ${targetWorker}`,
-  "npx",
-  ["wrangler", "deploy", "--config", "wrangler.jsonc"],
-  deployEnv,
-);
-console.log(`[boardverse-build] explicit live Worker deploy completed: ${targetWorker}`);
