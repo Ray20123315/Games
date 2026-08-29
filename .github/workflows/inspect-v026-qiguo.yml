@@ -1,27 +1,50 @@
-name: Inspect v0.0.26 Seven Kingdoms architecture
+name: Test v0.0.26 Seven Kingdoms simulation
 on:
   push:
     branches: [feature/qiguo-xiangqi-v0.0.26]
 jobs:
-  inspect:
+  test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build v0.0.25
+      - name: Build through v0.0.25 and simulate v0.0.26
         working-directory: BoardVerse
         run: |
           node build-worker.mjs
           for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025; do node post-build-v${v}.mjs; done
+          node simulate-v026.mjs
           node --check worker.js
-      - name: Inspect details
+      - name: Verify Seven Kingdoms markers and invariants
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
           const s=await readFile('worker.js','utf8');
-          function block(marker){const a=s.indexOf(marker);if(a<0){console.log('MISSING '+marker);return}const o=s.indexOf('{',a);let d=0,q='',esc=false,line=false,com=false;for(let i=o;i<s.length;i++){const c=s[i],n=s[i+1];if(line){if(c==='\n')line=false;continue}if(com){if(c==='*'&&n==='/'){com=false;i++}continue}if(q){if(esc){esc=false;continue}if(c==='\\'){esc=true;continue}if(c===q)q='';continue}if(c==='/'&&n==='/'){line=true;i++;continue}if(c==='/'&&n==='*'){com=true;i++;continue}if(c==='"'||c==="'"||c==='`'){q=c;continue}if(c==='{')d++;else if(c==='}'&&--d===0){console.log('\n--- '+marker+' ---\n'+s.slice(a,i+1));return}}}
-          for(const m of ['function renderOpening(','function bindPoint(','function renderPublicRooms(','function renderLobbyRooms(','  async voteRematch(token) {','  async alarm() {','  async queueSettings(token, msg) {','  startReplay() {'])block(m);
+          const must=[
+            'const APP_VERSION = "0.0.26";',
+            'GAME_CATALOG.qiguo',
+            'RULE_DEFS.qiguo',
+            'playerCount:7,drawMode:"country"',
+            'const QIGUO_ORDER = ["qin","han","chu","wei","qi","yan","zhao"]',
+            'qin:"秦",han:"韓",chu:"楚",wei:"魏",qi:"齊",yan:"燕",zhao:"趙"',
+            'function newQiguo(', 'function applyQiguo(', 'function qiguoGroups(',
+            'mode:"qiguo_number"', 'mode:"qiguo_country"',
+            'msg.type === "qiguo_choose"', 'async handleQiguoChoose(',
+            'room.gameId === "qiguo"', 'gameCapacity(room.gameId',
+            'renderQiguo(g,el,interactive)', 'qiguo-piece',
+            '秦 → 韓 → 楚 → 魏 → 齊 → 燕 → 趙',
+            '擒得二將，稱霸', '累計吃滿 30 子，稱霸'
+          ];
+          for(const m of must) if(!s.includes(m)) throw new Error('missing '+m);
+          if(!s.includes('capacity=gameCapacity(room.gameId,room.rules||{})')) throw new Error('dynamic room capacity missing');
+          if(!s.includes('settings.queueEnabled=false')) throw new Error('qiguo queue must be disabled');
+          if(!s.includes('QIGUO_START')) throw new Error('initial layout missing');
+          const pos=s.match(/qin:\[\[6,0\][\s\S]*?zhao:\[\[0,2\][\s\S]*?\],\n\};/);
+          if(!pos) throw new Error('7-5-3-1-1 layout block missing');
+          console.log('V026_FINAL_BYTES='+Buffer.byteLength(s));
+          console.log('V026_FINAL_SHA256='+createHash('sha256').update(s).digest('hex'));
           NODE
