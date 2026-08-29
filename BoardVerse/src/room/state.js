@@ -27,7 +27,6 @@ export function ensureFeatureState(room, now = Date.now()) {
       playerChatSlowMs: 0,
       spectatorChatSlowMs: 0,
       memberUsers: {},
-      memberIdentity: {},
       createdAt: now,
       updatedAt: now,
     };
@@ -39,7 +38,6 @@ export function ensureFeatureState(room, now = Date.now()) {
   if (!Array.isArray(bv.events)) bv.events = [];
   if (!bv.deadlines || typeof bv.deadlines !== "object") bv.deadlines = {};
   if (!bv.memberUsers || typeof bv.memberUsers !== "object") bv.memberUsers = {};
-  if (!bv.memberIdentity || typeof bv.memberIdentity !== "object") bv.memberIdentity = {};
   if (!bv.clockConfig) bv.clockConfig = { mode: "untimed" };
   if (typeof bv.adminPaused !== "boolean") bv.adminPaused = false;
   if (!bv.adminPaused) bv.adminPausedAt = null;
@@ -60,8 +58,6 @@ export function ensureFeatureState(room, now = Date.now()) {
   bv.clockConfig = normalizeClockConfig(bv.clockConfig);
   for (const id of room.seats || []) if (id && !(id in bv.ready)) bv.ready[id] = room.status === "playing";
   for (const id of Object.keys(bv.ready)) if (!(room.seats || []).includes(id)) delete bv.ready[id];
-  const currentIds = new Set((room.members || []).map((member) => member?.id).filter(Boolean));
-  for (const id of Object.keys(bv.memberIdentity)) if (!currentIds.has(id)) delete bv.memberIdentity[id];
   bv.updatedAt = now;
   return bv;
 }
