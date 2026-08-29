@@ -1,4 +1,5 @@
 import { html } from "../core/http.js";
+import { ADMIN_CLEANUP_SCRIPT } from "./cleanup-ui.js";
 import { ADMIN_WORKBENCH_SCRIPT, ADMIN_WORKBENCH_STYLE, adminDashboardMarkup } from "./workbench.js";
 
 const shell=(title,body,script="")=>html(`<!doctype html><html lang="zh-Hant-TW"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(title)}</title><style>${ADMIN_WORKBENCH_STYLE}</style></head><body>${body}${script?`<script>${script}</script>`:""}</body></html>`);
@@ -8,7 +9,7 @@ export function adminLoginPage(message="") {
 }
 
 export function adminDashboardPage() {
-  return shell("BoardVerse Admin",adminDashboardMarkup(),ADMIN_WORKBENCH_SCRIPT);
+  return shell("BoardVerse Admin",adminDashboardMarkup(),ADMIN_WORKBENCH_SCRIPT + ADMIN_CLEANUP_SCRIPT);
 }
 
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
