@@ -29,8 +29,8 @@
     "TURNSTILE_HOSTNAMES": "xn--gmqt6w03b11v.ray2025.com,多人棋室.ray2025.com"
   }
 
-  // Root-level mirror for Cloudflare Workers Builds, which currently invokes
-  // Wrangler from the repository root. Canonical application source remains
-  // under BoardVerse/. Keep this file aligned with BoardVerse/wrangler.jsonc.
-  // BOARDVERSE_DB remains external until the real D1 UUID is configured.
+  // Production shape for BoardVerse. Workers Builds currently invokes a fixed
+  // root-level `npx wrangler ...` command, so the repository-local CI adapter
+  // selects a safe preview config or an authenticated production runtime config.
+  // BOARDVERSE_DB is injected only at build time and is never committed here.
 }
