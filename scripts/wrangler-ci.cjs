@@ -64,15 +64,6 @@ async function d1ByName(name) {
 }
 
 function productionConfig(databaseId) {
-  const liveDoExports = Object.fromEntries([
-    'GameRoom',
-    'GlobalChat',
-    'BoardVerseDb',
-    'GameRoomV011',
-    'GlobalChatV011',
-    'BoardVerseDbV011',
-  ].map((className) => [className, { type: 'durable-object', storage: 'sqlite' }]));
-
   const config = {
     name: 'games',
     main: 'BoardVerse/src/index-v011.js',
@@ -81,14 +72,10 @@ function productionConfig(databaseId) {
     keep_vars: true,
     durable_objects: {
       bindings: [
-        { name: 'ROOMS', class_name: 'GameRoomV011' },
-        { name: 'GLOBAL_CHAT', class_name: 'GlobalChatV011' },
-        { name: 'BOARDVERSE_DB_DO', class_name: 'BoardVerseDbV011' },
+        { name: 'ROOMS', class_name: 'GameRoom' },
+        { name: 'BOARDVERSE_DB_DO', class_name: 'GameRoom' },
       ],
     },
-    exports: liveDoExports,
-    triggers: { crons: ['0 16 * * *'] },
-    observability: { enabled: true },
     vars: {
       TURNSTILE_SITE_KEY: '0x4AAAAAAEgJg9Xf_BRP8k0b',
       TURNSTILE_HOSTNAMES: 'xn--gmqt6w03b11v.ray2025.com,多人棋室.ray2025.com',
@@ -114,11 +101,6 @@ function productionConfig(databaseId) {
     db = d1Binding(gamesSettings);
     console.log(`[boardverse-ci] games BOARDVERSE_DB binding: ${db ? 'present' : 'absent'}`);
     if (!db) {
-      const legacySettings = await settings('crimson-haze-0a4d');
-      db = d1Binding(legacySettings);
-      console.log(`[boardverse-ci] legacy BOARDVERSE_DB binding: ${db ? 'present' : 'absent'}`);
-    }
-    if (!db) {
       db = await d1ByName('boardverse');
       console.log(`[boardverse-ci] account D1 named boardverse: ${db ? 'present' : 'unavailable'}`);
     }
@@ -129,7 +111,7 @@ function productionConfig(databaseId) {
   }
 
   const configPath = productionConfig(db?.database_id || null);
-  console.log(`[boardverse-ci] production database backend: ${db?.database_id ? 'D1 + Durable fallback' : 'Durable SQLite fallback'}`);
+  console.log(`[boardverse-ci] production database backend: ${db?.database_id ? 'D1 + existing GameRoom fallback' : 'existing GameRoom SQLite fallback'}`);
   process.exit(runReal(['deploy', '--config', configPath]));
 })().catch((error) => {
   console.error(`[boardverse-ci] ${error.stack || error.message}`);
