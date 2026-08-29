@@ -64,6 +64,15 @@ async function d1ByName(name) {
 }
 
 function productionConfig(databaseId) {
+  const liveDoExports = Object.fromEntries([
+    'GameRoom',
+    'GlobalChat',
+    'BoardVerseDb',
+    'GameRoomV011',
+    'GlobalChatV011',
+    'BoardVerseDbV011',
+  ].map((className) => [className, { type: 'durable-object', storage: 'sqlite' }]));
+
   const config = {
     name: 'games',
     main: 'BoardVerse/src/index-v011.js',
@@ -77,12 +86,7 @@ function productionConfig(databaseId) {
         { name: 'BOARDVERSE_DB_DO', class_name: 'BoardVerseDbV011' },
       ],
     },
-    migrations: [
-      {
-        tag: 'boardverse-v011-visible-platform-20260829',
-        new_sqlite_classes: ['GameRoomV011', 'GlobalChatV011', 'BoardVerseDbV011'],
-      },
-    ],
+    exports: liveDoExports,
     triggers: { crons: ['0 16 * * *'] },
     observability: { enabled: true },
     vars: {
