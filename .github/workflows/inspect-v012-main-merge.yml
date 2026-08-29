@@ -53,6 +53,8 @@ jobs:
           s=s.replace('assert.match(workbench, /id="bulkManageBtn"/);','assert.match(workbench, /bulkManageBtn/);')
           s=s.replace('assert.match(workbench, /id="selectAllUsers"/);','assert.match(workbench, /selectAllUsers/);')
           s=s.replace('assert.match(adminApi, /results\\.push\\(\\{ username: user\\.username_display, ok: true \\}\\)/);','assert.match(adminApi, /results\\.push\\(\\{\\s*username:\\s*user\\.username_display,\\s*ok:\\s*true\\s*\\}\\)/);')
+          s=s.replace('assert.match(adminApi, /action === "confirmed_cheating"/);','assert.match(adminApi, /action\\s*===\\s*"confirmed_cheating"/);')
+          s=s.replace('assert.match(adminApi, /applyDiscipline\\(db, user\\.id, action/);','assert.match(adminApi, /applyDiscipline\\(db,\\s*user\\.id,\\s*action/);')
           p.write_text(s)
           PY
           git add BoardVerse/test/i18n.test.mjs BoardVerse/test/feature-policy.test.mjs
