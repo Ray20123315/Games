@@ -44,6 +44,7 @@ try {
     "admin_login_attempts",
     "user_login_attempts",
     "chat_mutes",
+    "chat_archive",
     "active_rooms",
   ]);
   const missing = [...required].filter((name) => !tables.has(name));
