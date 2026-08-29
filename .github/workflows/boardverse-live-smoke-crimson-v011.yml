@@ -1,0 +1,49 @@
+name: BoardVerse live production smoke on existing Worker
+
+on:
+  push:
+    branches: [boardverse-live-smoke-crimson-v011]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify live production surfaces
+        shell: bash
+        run: |
+          set -u
+          BASE='https://xn--gmqt6w03b11v.ray2025.com'
+          tmp="$(mktemp -d)"
+          nonce="$(date +%s)"
+          fail=0
+
+          home_code=$(curl --retry 4 --retry-delay 2 -sS -o "$tmp/home.html" -w '%{http_code}' "$BASE/?smoke=$nonce")
+          echo "HOME=$home_code"
+          grep -q 'id="bvPublicNav"' "$tmp/home.html" && echo 'NAV=present' || { echo 'NAV=absent'; fail=1; }
+          grep -q 'v0.1.1' "$tmp/home.html" && echo 'VERSION_NAV=present' || { echo 'VERSION_NAV=absent'; fail=1; }
+          [ "$home_code" = 200 ] || fail=1
+
+          admin_code=$(curl --retry 4 --retry-delay 2 -sS -D "$tmp/admin.headers" -o "$tmp/admin.body" -w '%{http_code}' "$BASE/admin?smoke=$nonce")
+          admin_location=$(grep -i '^location:' "$tmp/admin.headers" | tr -d '\r' | head -1 || true)
+          echo "ADMIN=$admin_code ${admin_location:-no-location}"
+          [ "$admin_code" = 302 ] || fail=1
+          grep -qi '^location: .*\/admin/' "$tmp/admin.headers" || fail=1
+
+          for path in admin/ report register login; do
+            safe="${path//\//_}"
+            code=$(curl --retry 4 --retry-delay 2 -sS -o "$tmp/$safe.body" -w '%{http_code}' "$BASE/$path?smoke=$nonce")
+            echo "${path^^}=$code"
+            if [ "$code" = 404 ] || [ "$code" -lt 200 ] || [ "$code" -ge 400 ]; then
+              fail=1
+              head -c 180 "$tmp/$safe.body" | tr '\n' ' ' || true
+              echo
+            fi
+          done
+
+          if [ "$fail" = 0 ]; then
+            echo 'LIVE_SURFACES=PASS'
+            exit 0
+          fi
+          echo 'LIVE_SURFACES=FAIL'
+          exit 1
