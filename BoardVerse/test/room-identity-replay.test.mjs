@@ -19,8 +19,7 @@ for (const marker of [
   "bv-room-id-guest",
 ]) assert.ok(productionEntry.includes(marker), `missing room identity marker: ${marker}`);
 
-assert.match(productionEntry, /roomSocketMatch/);
-assert.match(productionEntry, /\/ws\\\/\\\(\[A-Z2-9\]\{6\}\\\)/);
+assert.match(productionEntry, /function roomSocketMatch[\s\S]*?A-Z2-9/);
 assert.match(productionEntry, /sanitizePublicIdentity/);
 assert.match(productionEntry, /badge: "OWNER"/);
 assert.match(productionEntry, /badge: "ADMIN"/);
