@@ -74,10 +74,11 @@ function productionConfig(databaseId) {
       bindings: [
         { name: 'ROOMS', class_name: 'GameRoom' },
         { name: 'GLOBAL_CHAT', class_name: 'GlobalChat' },
+        { name: 'BOARDVERSE_DB_DO', class_name: 'BoardVerseDb' },
       ],
     },
     migrations: [
-      { tag: 'boardverse-v011-sqlite-do', new_sqlite_classes: ['GameRoom', 'GlobalChat'] },
+      { tag: 'boardverse-v011-sqlite-do', new_sqlite_classes: ['GameRoom', 'GlobalChat', 'BoardVerseDb'] },
     ],
     triggers: { crons: ['0 16 * * *'] },
     observability: { enabled: true },
@@ -85,10 +86,12 @@ function productionConfig(databaseId) {
       TURNSTILE_SITE_KEY: '0x4AAAAAAEgJg9Xf_BRP8k0b',
       TURNSTILE_HOSTNAMES: 'xn--gmqt6w03b11v.ray2025.com,多人棋室.ray2025.com',
     },
-    d1_databases: [
-      { binding: 'BOARDVERSE_DB', database_name: 'boardverse', database_id: databaseId },
-    ],
   };
+  if (databaseId) {
+    config.d1_databases = [
+      { binding: 'BOARDVERSE_DB', database_name: 'boardverse', database_id: databaseId },
+    ];
+  }
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'boardverse-wrangler-'));
   const file = path.join(dir, 'wrangler.production.json');
   fs.writeFileSync(file, JSON.stringify(config, null, 2));
@@ -98,15 +101,13 @@ function productionConfig(databaseId) {
 (async () => {
   console.log(`[boardverse-ci] adapter active; branch=${branch || '(unknown)'}; production=${isProduction}`);
 
-  let gamesSettings = null;
-  let legacySettings = null;
   let db = null;
   if (isWorkersBuild) {
-    gamesSettings = await settings('games');
+    const gamesSettings = await settings('games');
     db = d1Binding(gamesSettings);
     console.log(`[boardverse-ci] games BOARDVERSE_DB binding: ${db ? 'present' : 'absent'}`);
     if (!db) {
-      legacySettings = await settings('crimson-haze-0a4d');
+      const legacySettings = await settings('crimson-haze-0a4d');
       db = d1Binding(legacySettings);
       console.log(`[boardverse-ci] legacy BOARDVERSE_DB binding: ${db ? 'present' : 'absent'}`);
     }
@@ -114,17 +115,14 @@ function productionConfig(databaseId) {
       db = await d1ByName('boardverse');
       console.log(`[boardverse-ci] account D1 named boardverse: ${db ? 'present' : 'unavailable'}`);
     }
-    if (!db?.database_id) {
-      throw new Error('Could not discover the existing boardverse D1 database; refusing to publish a build with broken registration/admin/report persistence.');
-    }
   }
 
   if (!isProduction) {
     process.exit(runReal(['versions', 'upload', '--config', 'wrangler.preview.jsonc']));
   }
 
-  const configPath = productionConfig(db.database_id);
-  console.log('[boardverse-ci] production D1 discovery complete; deploying BoardVerse to games.');
+  const configPath = productionConfig(db?.database_id || null);
+  console.log(`[boardverse-ci] production database backend: ${db?.database_id ? 'D1 + Durable fallback' : 'Durable SQLite fallback'}`);
   process.exit(runReal(['deploy', '--config', configPath]));
 })().catch((error) => {
   console.error(`[boardverse-ci] ${error.stack || error.message}`);
