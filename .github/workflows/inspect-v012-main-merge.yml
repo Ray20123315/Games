@@ -22,6 +22,20 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git fetch origin main
           git merge --no-commit --no-ff origin/main || true
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('BoardVerse/tools/reconcile-v012-main.mjs')
+          s=p.read_text()
+          old="  s = one(s, \"if(key==='rooms'){grid.classList.add('rooms');tools.hidden=true;roomToolbar();loadRooms();return}\", \"if(key==='rooms'){grid.classList.remove('rooms','audit');tools.hidden=false;roomToolbar();loadRooms();return}if(key==='users'){grid.classList.remove('rooms','audit');tools.hidden=false;userToolbar();toolsUsers();loadUsers('');return}\", 'users configure path');"
+          # The temporary script was written against an earlier configure() spelling. Replace its whole one() call by label.
+          import re
+          pat=r"  s = one\(s, \"if\(key==='rooms'\).*?'users configure path'\);"
+          repl="  s = one(s, \"if(key==='users'){toolsUsers();loadUsers('');return}\", \"if(key==='users'){userToolbar();toolsUsers();loadUsers('');return}\", 'users configure path');"
+          s2,n=re.subn(pat,repl,s,count=1)
+          if n!=1:
+              raise SystemExit(f'configure anchor patch hits={n}')
+          p.write_text(s2)
+          PY
           node BoardVerse/tools/reconcile-v012-main.mjs
           test -z "$(git diff --name-only --diff-filter=U)"
       - name: Install dependencies
