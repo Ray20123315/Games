@@ -11,7 +11,7 @@ import { checkIn, canCreateCustomRoom, consumeCustomRoom, deletePreset, getUserM
 import { publicReplayByToken, replayById, cleanupReplayArchive } from "./replay/archive.js";
 import { offlineReplayResponse, replayResponse } from "./replay/replay-page.js";
 import { createReport } from "./reports/reports.js";
-import { adminLogin, adminPlayerEntitlement, issueAdminPlayerEntitlement, requireAdmin } from "./admin/auth.js";
+import { adminLogin, adminPlayerEntitlement, adminUserLogin, issueAdminPlayerEntitlement, requireAdmin } from "./admin/auth.js";
 import { adminApi } from "./admin/api.js";
 import { adminDashboardPage, adminLoginPage } from "./admin/pages.js";
 import { accountPage, activatePage, authPage, forgotPage, reportPage, resetPage } from "./ui/pages.js";
@@ -30,12 +30,16 @@ function roomStub(env, roomId) { if (!env?.ROOMS) throw new HttpError(503,"missi
 function randomRoomCode() { const bytes=crypto.getRandomValues(new Uint8Array(6)); let out=""; for(const b of bytes) out+=ALPHABET[b%ALPHABET.length]; return out; }
 async function currentUserMaybe(env, request) { if(!env?.BOARDVERSE_DB) return null; try { return await sessionUser(env.BOARDVERSE_DB,request); } catch { return null; } }
 async function bodyInput(request) { const ct=request.headers.get("content-type")||""; if(ct.includes("application/json")) return request.json(); if(ct.includes("application/x-www-form-urlencoded")||ct.includes("multipart/form-data")) return formObject(await request.formData()); return {}; }
-async function guardedLogin(db, request, identifier, password) {
+async function guardedLogin(db, env, request, identifier, password) {
   const key=await sha256Hex(`${clientIp(request)}|${String(identifier||"").normalize("NFKC").trim().toLocaleLowerCase("en-US")}`), now=Date.now(), floor=now-15*60_000;
   const row=await db.prepare("SELECT window_start,failure_count,blocked_until FROM user_login_attempts WHERE login_key=?").bind(key).first();
   if(Number(row?.blocked_until||0)>now) throw new HttpError(429,"login_locked","登入嘗試過多，請稍後再試。");
   try { const out=await loginUser(db,identifier,password); await run(db,"DELETE FROM user_login_attempts WHERE login_key=?",key); return out; }
-  catch(e){ if(e?.code==="login_failed"){let count=Number(row?.failure_count||0),start=Number(row?.window_start||now);if(start<floor){count=0;start=now}count++;const blocked=count>=5?now+15*60_000:null;await run(db,`INSERT INTO user_login_attempts(login_key,window_start,failure_count,blocked_until,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(login_key) DO UPDATE SET window_start=excluded.window_start,failure_count=excluded.failure_count,blocked_until=excluded.blocked_until,updated_at=excluded.updated_at`,key,start,count,blocked,now);}throw e;}
+  catch(e){
+    const adminOut=await adminUserLogin(db,env,identifier,password);
+    if(adminOut){await run(db,"DELETE FROM user_login_attempts WHERE login_key=?",key);return adminOut;}
+    if(e?.code==="login_failed"){let count=Number(row?.failure_count||0),start=Number(row?.window_start||now);if(start<floor){count=0;start=now}count++;const blocked=count>=5?now+15*60_000:null;await run(db,`INSERT INTO user_login_attempts(login_key,window_start,failure_count,blocked_until,updated_at) VALUES(?,?,?,?,?) ON CONFLICT(login_key) DO UPDATE SET window_start=excluded.window_start,failure_count=excluded.failure_count,blocked_until=excluded.blocked_until,updated_at=excluded.updated_at`,key,start,count,blocked,now);}throw e;
+  }
 }
 function cleanCreateFeature(raw={}) {
   const f=raw&&typeof raw==="object"?raw:{};
@@ -104,7 +108,7 @@ async function route(request, env) {
   if(path==="/api/resend-verification"&&method==="POST") { const db=requireDb(env),b=await bodyInput(request); await resendVerification(db,env,request,b.identifier||b.email,baseUrl(request)); return json({ok:true,message:"若帳號尚待驗證，驗證信已重新送出。"}); }
   if(path==="/verify"&&method==="GET") { const db=requireDb(env); await verifyEmailToken(db,url.searchParams.get("token")||""); return authPage("login","Email 驗證完成，現在可以登入。"); }
   if(path==="/login"&&method==="GET") return authPage("login");
-  if(path==="/login"&&method==="POST") { const db=requireDb(env),b=await bodyInput(request), result=await guardedLogin(db,request,b.identifier,b.password); return redirect("/account",303,{"set-cookie":result.session.setCookie}); }
+  if(path==="/login"&&method==="POST") { const db=requireDb(env),b=await bodyInput(request), result=await guardedLogin(db,env,request,b.identifier,b.password); return redirect("/account",303,{"set-cookie":result.session.setCookie}); }
   if(path==="/logout"&&method==="GET") { if(env.BOARDVERSE_DB)await revokeCurrentSession(env.BOARDVERSE_DB,request); return redirect("/",303,{"set-cookie":clearCookie(USER_COOKIE)}); }
   if(path==="/forgot"&&method==="GET") return forgotPage();
   if(path==="/forgot"&&method==="POST") { const db=requireDb(env),b=await bodyInput(request); await requestPasswordReset(db,env,request,b.identifier,baseUrl(request)); return forgotPage("若帳號存在，重設信已送出。請避免重複要求寄送。"); }
