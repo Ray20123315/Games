@@ -47,8 +47,14 @@ jobs:
           s2,n=re.subn(pat,repl,s,count=1)
           if n!=1: raise SystemExit(f'admin i18n assertion replacement hits={n}')
           p.write_text(s2)
+
+          p=Path('BoardVerse/test/feature-policy.test.mjs')
+          s=p.read_text()
+          s=s.replace('assert.match(workbench, /id="bulkManageBtn"/);','assert.match(workbench, /bulkManageBtn/);')
+          s=s.replace('assert.match(workbench, /id="selectAllUsers"/);','assert.match(workbench, /selectAllUsers/);')
+          p.write_text(s)
           PY
-          git add BoardVerse/test/i18n.test.mjs
+          git add BoardVerse/test/i18n.test.mjs BoardVerse/test/feature-policy.test.mjs
           test -z "$(git diff --name-only --diff-filter=U)"
       - name: Install dependencies
         working-directory: BoardVerse
