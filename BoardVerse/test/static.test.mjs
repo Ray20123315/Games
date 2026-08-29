@@ -58,8 +58,10 @@ assert.match(ui,/row\.hidden=!show/,"game filter must compose with existing text
 assert.match(ui,/bvVoiceLeave/,"voice leave UI missing");
 assert.match(ui,/bvRoomPlayerSlow/,"room slow-mode UI missing");
 const replayPage=await readFile(new URL("../src/replay/replay-page.js",import.meta.url),"utf8");
-assert.match(replayPage,/pieceText\(p,g\.type\)/,"replay renderer must distinguish game piece alphabets");
+assert.match(replayPage,/function renderIntersectionBoard/,"standalone replay must use live-style intersection boards");
+assert.match(replayPage,/function renderXiangqi/,"standalone replay must use the Xiangqi line-board renderer");
 assert.match(replayPage,/bK:'將'/,"Xiangqi black king must render as 將");
+assert.doesNotMatch(replayPage,/className='cell'/,"standalone replay must not fall back to the old cell renderer");
 const cfg=await readFile(new URL("../src/core/config.js",import.meta.url),"utf8"); assert.ok(cfg.includes("stun:stun.cloudflare.com:3478"));
 for(const game of ["xiangqi_random","banqi","qiguo"]) assert.ok(cfg.includes(`"${game}"`), game);
 assert.match(gr,/room\.seats\?\.length === 2/); assert.match(gr,/七國象棋.*暫不提供.*悔棋/);
