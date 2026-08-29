@@ -152,6 +152,8 @@ insertBefore('function renderIntersectionBoard(g,el,interactive){', `function re
 insertBefore('</style>\n</head>', `.qiguo-board{background:#c9a86a;border-radius:12px}.qiguo-board .point-btn{z-index:2}.qiguo-piece{width:82%;height:82%;min-width:20px;min-height:20px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:clamp(9px,2.2cqw,18px);line-height:1;border:2px solid rgba(30,24,14,.78);box-shadow:0 2px 5px rgba(0,0,0,.32),inset 0 0 0 1px rgba(255,255,255,.34);user-select:none}.qiguo-board .point-btn.selected .qiguo-piece{outline:3px solid #e7d7a8;outline-offset:2px}.qiguo-board .point-btn.last .qiguo-piece:after{content:"";position:absolute;width:20%;height:20%;border-radius:50%;background:#f7f4ec;box-shadow:0 0 0 1px rgba(0,0,0,.6)}\n`, 'qiguo css');
 
 const outHash=createHash("sha256").update(source).digest("hex");
+const expectedOutputHash = "99034cdba2d1b72473ef50fc5ad0b190f007cb4638d40dddd7ce8959a9606fd0";
+if (outHash !== expectedOutputHash) throw new Error(`v0.0.26 output hash mismatch: ${outHash}`);
 await writeFile(worker,source,"utf8");
 console.log(`V026_BYTES=${Buffer.byteLength(source)}`);
 console.log(`V026_SHA256=${outHash}`);
