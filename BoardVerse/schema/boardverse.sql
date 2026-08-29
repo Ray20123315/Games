@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS disciplinary_actions (
 );
 CREATE INDEX IF NOT EXISTS idx_discipline_user ON disciplinary_actions(user_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS audit_logs (
- id TEXT PRIMARY KEY, admin_actor TEXT NOT NULL, action_type TEXT NOT NULL, target_type TEXT, target_id TEXT, reason TEXT,
+ id TEXT PRIMARY KEY, admin_actor TEXT NOT NULL, action_type TEXT, target_type TEXT, target_id TEXT, reason TEXT,
  before_json TEXT, after_json TEXT, created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
@@ -101,3 +101,10 @@ CREATE TABLE IF NOT EXISTS chat_mutes (
  subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, channel TEXT NOT NULL, muted_until INTEGER, reason TEXT, created_at INTEGER NOT NULL,
  PRIMARY KEY(subject_type,subject_id,channel)
 );
+CREATE TABLE IF NOT EXISTS chat_archive (
+ id TEXT PRIMARY KEY, channel TEXT NOT NULL, room_id TEXT, sender_kind TEXT NOT NULL, sender_id TEXT,
+ sender_name TEXT NOT NULL, message_text TEXT NOT NULL, created_at INTEGER NOT NULL, delete_after INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chat_archive_created ON chat_archive(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_archive_room ON chat_archive(room_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_archive_delete ON chat_archive(delete_after);
