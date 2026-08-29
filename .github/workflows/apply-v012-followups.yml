@@ -1,14 +1,14 @@
-name: Apply v0.1.2 homepage follow-ups
+name: Gate v0.1.2 final merge
 on:
   push:
     branches: [feat/admin-workbench-v0.1.2]
 permissions:
   contents: write
 jobs:
-  apply:
+  verify:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: BoardVerse
@@ -19,21 +19,37 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Apply patch
-        run: node tools/patch-v012-followups3.mjs
-      - name: Install dependencies
+      - name: Install project dependencies
         run: npm install --ignore-scripts
       - name: Full regression suite
         run: npm test
-      - name: Production dry-run
+      - name: Install browser driver
+        run: npm install --no-save --ignore-scripts puppeteer-core@24
+      - name: Find Chrome
+        run: |
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          "$CHROME" --version
+      - name: Start branch Worker
+        run: |
+          npx wrangler dev --local --port 8787 > /tmp/wrangler.log 2>&1 &
+          echo $! > /tmp/wrangler.pid
+          for i in $(seq 1 45); do curl -fsS http://127.0.0.1:8787/ >/dev/null 2>&1 && exit 0; sleep 1; done
+          cat /tmp/wrangler.log
+          exit 1
+      - name: Fresh browser homepage must stay responsive
+        env:
+          TARGET_URL: http://127.0.0.1:8787/
+        run: timeout 35s node test/fresh-home-inspect.mjs
+      - name: Production deploy dry-run
         run: npx wrangler deploy --dry-run --outdir dist --config wrangler.jsonc
-      - name: Commit verified changes
+      - name: Write verified SHA marker
         working-directory: .
         run: |
-          git status --short
+          printf '%s\n' "$GITHUB_SHA" > BoardVerse/.v012-final-verified
           git config user.name github-actions[bot]
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add BoardVerse/src BoardVerse/test
-          if git diff --cached --quiet; then echo 'No product changes'; exit 0; fi
-          git commit -m 'fix: stabilize fresh homepage and custom creation UI'
+          git add BoardVerse/.v012-final-verified
+          git commit -m 'ci: mark v0.1.2 final verification passed'
           git push origin HEAD:feat/admin-workbench-v0.1.2
