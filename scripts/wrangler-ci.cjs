@@ -133,31 +133,24 @@ async function attachAndVerifyDomain() {
   return live;
 }
 
-async function reconcileCatchAllRoute(zoneId) {
+async function removeConflictingCatchAllRoute(zoneId) {
   const routePath = `/zones/${zoneId}/workers/routes`;
   const routes = await cfRequest('GET', routePath);
   const rows = Array.isArray(routes) ? routes : [];
-  let route = rows.find((item) => String(item?.pattern || '').toLowerCase() === PROD_ROUTE.toLowerCase());
-  if (route) {
-    if (route.script !== PROD_SERVICE) {
-      console.log(`[boardverse-ci] repointing existing Worker Route ${route.pattern}: ${route.script || '(none)'} -> ${PROD_SERVICE}`);
-      route = await cfRequest('PUT', `${routePath}/${route.id}`, { pattern: route.pattern, script: PROD_SERVICE });
-    } else {
-      console.log(`[boardverse-ci] Worker Route already points to ${PROD_SERVICE}: ${route.pattern}`);
-    }
-  } else {
-    console.log(`[boardverse-ci] creating Worker Route ${PROD_ROUTE} -> ${PROD_SERVICE}`);
-    route = await cfRequest('POST', routePath, { pattern: PROD_ROUTE, script: PROD_SERVICE });
+  const route = rows.find((item) => String(item?.pattern || '').toLowerCase() === PROD_ROUTE.toLowerCase());
+  if (!route) {
+    console.log(`[boardverse-ci] no conflicting Worker Route found for ${PROD_ROUTE}`);
+    return;
   }
-  if (!route?.id || route?.script !== PROD_SERVICE || String(route?.pattern || '').toLowerCase() !== PROD_ROUTE.toLowerCase()) {
-    throw new Error(`Worker Route reconciliation returned unexpected result: ${JSON.stringify(route)}`);
-  }
+  if (!route.id) throw new Error(`Conflicting Worker Route is missing an id: ${JSON.stringify(route)}`);
+  console.log(`[boardverse-ci] removing conflicting Worker Route ${route.pattern} -> ${route.script || '(none)'}`);
+  await cfRequest('DELETE', `${routePath}/${route.id}`);
   const verified = await cfRequest('GET', routePath);
-  const check = (Array.isArray(verified) ? verified : []).find((item) => item?.id === route.id);
-  if (!check || check.script !== PROD_SERVICE || String(check.pattern || '').toLowerCase() !== PROD_ROUTE.toLowerCase()) {
-    throw new Error(`Worker Route read-back failed for ${PROD_ROUTE}`);
+  const stillPresent = (Array.isArray(verified) ? verified : []).find((item) => String(item?.pattern || '').toLowerCase() === PROD_ROUTE.toLowerCase());
+  if (stillPresent) {
+    throw new Error(`Conflicting Worker Route still exists for ${PROD_ROUTE}: ${JSON.stringify(stillPresent)}`);
   }
-  console.log(`[boardverse-ci] Worker Route verified: ${PROD_ROUTE} -> ${PROD_SERVICE}`);
+  console.log(`[boardverse-ci] conflicting Worker Route removed; Custom Domain is canonical for ${PROD_HOSTNAME}`);
 }
 
 (async () => {
@@ -190,7 +183,7 @@ async function reconcileCatchAllRoute(zoneId) {
   const deployStatus = runReal(['versions', 'deploy', '--config', configPath, '--version-tag', versionTag, '-y', '--message', message]);
   if (deployStatus !== 0) process.exit(deployStatus);
   const domain = await attachAndVerifyDomain();
-  await reconcileCatchAllRoute(domain.zone_id);
+  await removeConflictingCatchAllRoute(domain.zone_id);
   process.exit(0);
 })().catch((error) => {
   console.error(`[boardverse-ci] ${error.stack || error.message}`);
