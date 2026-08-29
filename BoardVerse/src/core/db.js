@@ -1,8 +1,41 @@
 import schemaSql from "../db/schema.js";
 import { HttpError } from "./http.js";
 
-
 let schemaReadyPromise = null;
+
+class DurablePreparedStatement {
+  constructor(stub, sql, binds = []) {
+    this.stub = stub;
+    this.sql = sql;
+    this.binds = binds;
+  }
+  bind(...binds) { return new DurablePreparedStatement(this.stub, this.sql, binds); }
+  first() { return this.stub.query("first", this.sql, this.binds); }
+  all() { return this.stub.query("all", this.sql, this.binds); }
+  run() { return this.stub.query("run", this.sql, this.binds); }
+}
+
+function durableDatabase(namespace) {
+  const stub = namespace.getByName("primary");
+  return {
+    exec(sql) { return stub.query("exec", sql, []); },
+    prepare(sql) { return new DurablePreparedStatement(stub, sql); },
+  };
+}
+
+export function withDatabaseEnv(env) {
+  if (!env || env.BOARDVERSE_DB || !env.BOARDVERSE_DB_DO) return env;
+  const db = durableDatabase(env.BOARDVERSE_DB_DO);
+  return new Proxy(env, {
+    get(target, prop, receiver) {
+      if (prop === "BOARDVERSE_DB") return db;
+      return Reflect.get(target, prop, receiver);
+    },
+    has(target, prop) {
+      return prop === "BOARDVERSE_DB" || Reflect.has(target, prop);
+    },
+  });
+}
 
 export async function ensureDbSchema(db) {
   if (!db) return;
@@ -13,8 +46,9 @@ export async function ensureDbSchema(db) {
 }
 
 export function requireDb(env) {
-  if (!env?.BOARDVERSE_DB) throw new HttpError(503, "database_unavailable", "BOARDVERSE_DB 尚未綁定；此功能目前不可用。");
-  return env.BOARDVERSE_DB;
+  const effective = withDatabaseEnv(env);
+  if (!effective?.BOARDVERSE_DB) throw new HttpError(503, "database_unavailable", "BoardVerse 資料庫尚未可用。");
+  return effective.BOARDVERSE_DB;
 }
 
 export async function first(db, sql, ...binds) {
