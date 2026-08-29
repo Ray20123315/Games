@@ -1,4 +1,4 @@
-import { STUN_URL } from "../core/config.js";
+import { APP_VERSION, STUN_URL } from "../core/config.js";
 
 export const BRIDGE_SCRIPT = String.raw`<script>
 (function(){
@@ -62,6 +62,7 @@ document.addEventListener('change',function(e){if(e.target&&e.target.id==='gameI
 
 export function enhanceLegacyHtml(source) {
   let html = String(source);
+  html = html.replace('<span class="small muted">v0.0.29</span>', `<span class="small muted">v${APP_VERSION}</span>`);
   const marker = "<script>\n(function(){";
   if (html.includes(marker)) html = html.replace(marker, `${BRIDGE_SCRIPT}${marker}`);
   else html = html.replace("</head>", `${BRIDGE_SCRIPT}</head>`);

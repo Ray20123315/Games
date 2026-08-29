@@ -6,6 +6,7 @@ assert.match(wr,/"main"\s*:\s*"src\/index\.js"/); assert.doesNotMatch(wr,/"build
 const idx=await readFile(new URL("../src/index.js",import.meta.url),"utf8"); assert.match(idx,/\.\/legacy\/runtime-v029\.js/); assert.match(idx,/scheduled/); assert.match(idx,/\/replay\//); assert.match(idx,/\/admin\/api\//); assert.match(idx,/\/ws\/global/);
 const gr=await readFile(new URL("../src/room/GameRoom.js",import.meta.url),"utf8"); for(const x of ["players_ready","undo_requested","undo_accepted","state_restored","rematch_requested","rematch_accepted","clock_timeout","owner_grace","voice_signal","adminTerminateGame","adminCloseRoom","qiguo","ensureFeatureGameStarted","rematchRequired"]) assert.ok(gr.includes(x),x);
 const ui=await readFile(new URL("../src/ui/enhance.js",import.meta.url),"utf8"); for(const x of ["navigator.share","getUserMedia","STUN_URL","bvGameFilter","bvReady","undo_request","BoardVerseBridge"]) assert.ok(ui.includes(x),x);
+assert.match(ui,/APP_VERSION/); assert.match(ui,/v0\.0\.29<\/span>/);
 const schema=await readFile(new URL("../src/db/schema.js",import.meta.url),"utf8"); for(const t of ["users","user_sessions","replays","replay_events","reports","risk_flags","disciplinary_actions","audit_logs","active_rooms"]) assert.ok(schema.includes(`TABLE IF NOT EXISTS ${t}`),t);
 
 assert.match(idx,/activateAdminUser/,"activation route should be wired");
