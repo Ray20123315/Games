@@ -100,6 +100,12 @@ relocate();
 })();
 </script>`;
 
+const OWNER_INTERNAL_ACCOUNT_HTML = '<p><span data-bv-h="帳號" data-bv-s="账号" data-bv-e="Account">帳號</span>：<strong>OWNER</strong> · <span data-bv-h="內部管理帳號" data-bv-s="内部管理账号" data-bv-e="Internal admin account">內部管理帳號</span></p>';
+
+function maskOwnerInternalEmail(source) {
+  return String(source || "").replace(/<p>Email：admin-[^<\s]+@boardverse\.invalid<\/p>/gi, OWNER_INTERNAL_ACCOUNT_HTML);
+}
+
 function injectAuthenticatedRoomUi(source) {
   let body = String(source || "").replace(/60s →/g, "20s →");
   if (body.includes('id="boardverse-auth-room-name"')) return body;
@@ -161,7 +167,8 @@ export default {
     if (!type.includes("text/html")) return response;
     const path = new URL(request.url).pathname;
     if (path.startsWith("/admin")) return response;
-    let body = injectAuthenticatedRoomUi(await response.text());
+    let body = maskOwnerInternalEmail(await response.text());
+    body = injectAuthenticatedRoomUi(body);
     body = injectHostKickVisibility(body);
     const headers = new Headers(response.headers);
     headers.delete("content-length");
