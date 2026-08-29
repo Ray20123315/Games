@@ -12,11 +12,14 @@ function injectPublicNav(source, pathname) {
 
 export default {
   async fetch(request, env, ctx) {
+    const requestUrl = new URL(request.url);
+    if (requestUrl.pathname === "/admin") {
+      return Response.redirect(new URL("/admin/", requestUrl), 302);
+    }
     const response = await app.fetch(request, env, ctx);
     const type = response.headers.get("content-type") || "";
     if (!type.includes("text/html")) return response;
-    const pathname = new URL(request.url).pathname;
-    const body = hardenPieceThemeHtml(injectPublicNav(await response.text(), pathname));
+    const body = hardenPieceThemeHtml(injectPublicNav(await response.text(), requestUrl.pathname));
     const headers = new Headers(response.headers);
     headers.delete("content-length");
     return new Response(body, { status: response.status, statusText: response.statusText, headers });
