@@ -10,6 +10,11 @@ import { createAdminActivation } from "../auth/users.js";
 
 const LIMIT = 50;
 const MAX_BULK_USERS = 20;
+const SETTINGS_DEFAULTS = Object.freeze({
+  global_chat_slow_ms: 5000,
+  global_chat_enabled: true,
+  maintenance_mode: false,
+});
 
 const cleanReason = (v) => {
   const s = String(v || "").trim().slice(0, 1000);
@@ -280,17 +285,57 @@ export async function adminApi({ db, env, request, path, url, actor }) {
   if (path === "/admin/api/announcement" && request.method === "POST") {
     const b = await request.json();
     const id = await saveAnnouncement(db, b, b.id || null);
-    await audit(db, "announcement.save", { adminActor: actor, targetType: "announcement", targetId: id, reason: "admin edit" });
+    await audit(db, "announcement.save", { adminActor: actor, targetType: "announcement", targetId: id, reason: String(b.reason || "admin edit").trim().slice(0, 1000) || "admin edit" });
     return { ok: true, id };
   }
+  if (path === "/admin/api/announcement/disable" && request.method === "POST") {
+    const b = await request.json();
+    const id = String(b.id || "").trim();
+    if (!id) throw new HttpError(400, "announcement_id_required", "請先選擇公告。");
+    const before = await first(db, "SELECT id,title,content,type,enabled,published_at,expires_at FROM announcements WHERE id=?", id);
+    if (!before) throw new HttpError(404, "announcement_not_found", "找不到公告。");
+    const reason = cleanReason(b.reason);
+    await run(db, "UPDATE announcements SET enabled=0,updated_at=? WHERE id=?", Date.now(), id);
+    await audit(db, "announcement.disable", { adminActor: actor, targetType: "announcement", targetId: id, reason, before, after: { ...before, enabled: 0 } });
+    return { ok: true, id, enabled: false };
+  }
+  if (path === "/admin/api/announcement/delete" && request.method === "POST") {
+    const b = await request.json();
+    const id = String(b.id || "").trim();
+    if (!id) throw new HttpError(400, "announcement_id_required", "請先選擇公告。");
+    const before = await first(db, "SELECT id,title,content,type,enabled,published_at,expires_at FROM announcements WHERE id=?", id);
+    if (!before) throw new HttpError(404, "announcement_not_found", "找不到公告。");
+    const reason = cleanReason(b.reason);
+    await run(db, "DELETE FROM announcements WHERE id=?", id);
+    await audit(db, "announcement.delete", { adminActor: actor, targetType: "announcement", targetId: id, reason, before, after: null });
+    return { ok: true, id, deleted: true };
+  }
 
+  if (path === "/admin/api/settings" && request.method === "GET") {
+    const rows = await all(db, "SELECT key,value_json,updated_at FROM system_settings WHERE key IN ('global_chat_slow_ms','global_chat_enabled','maintenance_mode')");
+    const stored = new Map(rows.map((row) => [row.key, row]));
+    return Object.fromEntries(Object.entries(SETTINGS_DEFAULTS).map(([key, defaultValue]) => {
+      const row = stored.get(key);
+      let value = defaultValue;
+      if (row) { try { value = JSON.parse(row.value_json); } catch {} }
+      return [key, { value, defaultValue, overridden: !!row, updatedAt: row?.updated_at || null }];
+    }));
+  }
   if (path === "/admin/api/settings" && request.method === "POST") {
     const b = await request.json();
-    const allowed = new Set(["global_chat_slow_ms", "global_chat_enabled", "maintenance_mode"]);
-    if (!allowed.has(b.key)) throw new HttpError(400, "setting_invalid", "不可修改此設定。");
+    if (!Object.prototype.hasOwnProperty.call(SETTINGS_DEFAULTS, b.key)) throw new HttpError(400, "setting_invalid", "不可修改此設定。");
     await setSetting(db, b.key, b.value);
-    await audit(db, "setting.update", { adminActor: actor, targetType: "setting", targetId: b.key, reason: cleanReason(b.reason) });
+    await audit(db, "setting.update", { adminActor: actor, targetType: "setting", targetId: b.key, reason: cleanReason(b.reason), after: { value: b.value } });
     return { ok: true };
+  }
+  if (path === "/admin/api/settings/reset" && request.method === "POST") {
+    const b = await request.json();
+    if (!Object.prototype.hasOwnProperty.call(SETTINGS_DEFAULTS, b.key)) throw new HttpError(400, "setting_invalid", "不可重設此設定。");
+    const reason = cleanReason(b.reason);
+    const before = await first(db, "SELECT value_json,updated_at FROM system_settings WHERE key=?", b.key);
+    await run(db, "DELETE FROM system_settings WHERE key=?", b.key);
+    await audit(db, "setting.reset", { adminActor: actor, targetType: "setting", targetId: b.key, reason, before: before ? { value: (() => { try { return JSON.parse(before.value_json); } catch { return before.value_json; } })(), updatedAt: before.updated_at } : null, after: { value: SETTINGS_DEFAULTS[b.key], source: "default" } });
+    return { ok: true, key: b.key, value: SETTINGS_DEFAULTS[b.key], defaultValue: SETTINGS_DEFAULTS[b.key], overridden: false };
   }
 
   if (path === "/admin/api/audit" && request.method === "GET") {
