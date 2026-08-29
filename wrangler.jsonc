@@ -8,6 +8,18 @@
       "custom_domain": true
     }
   ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "GameRoom" },
+      { "name": "GLOBAL_CHAT", "class_name": "GlobalChat" }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["GameRoom", "GlobalChat"]
+    }
+  ],
   "triggers": {
     "crons": ["0 16 * * *"]
   },
