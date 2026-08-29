@@ -33,5 +33,6 @@
   // BOARDVERSE_DB intentionally is not declared here until the real Cloudflare
   // D1 resource exists. Cloudflare requires binding + database_name + database_id.
   // Required production binding: BOARDVERSE_DB -> D1 database "boardverse".
-  // Do not replace this with a fabricated UUID.
+  // Workers Builds is validated through the repository-root CI adapter.
+  // Do not replace the D1 UUID with a fabricated value.
 }
