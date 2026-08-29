@@ -1,10 +1,13 @@
 import { spawnSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 
 const branch = process.env.WORKERS_CI_BRANCH || "local";
 const isWorkersBuild = Boolean(process.env.WORKERS_CI);
 const isProduction = isWorkersBuild && branch === "main";
 const targetWorker = "games";
 const connectedWorker = process.env.WRANGLER_CI_OVERRIDE_NAME || "(none)";
+const packageMeta = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
+const appVersion = String(packageMeta.version || "unknown");
 
 function run(label, command, args) {
   console.log(`[boardverse-build] ${label}`);
@@ -26,7 +29,7 @@ if (isWorkersBuild && connectedWorker !== targetWorker) {
 }
 
 console.log(
-  `[boardverse-build] validating BoardVerse v0.1.1; branch=${branch}; production=${isProduction}; ` +
+  `[boardverse-build] validating BoardVerse v${appVersion}; branch=${branch}; production=${isProduction}; ` +
     `connected-worker=${connectedWorker}; live-target=${targetWorker}`,
 );
 run("full regression suite", "npm", ["test"]);
