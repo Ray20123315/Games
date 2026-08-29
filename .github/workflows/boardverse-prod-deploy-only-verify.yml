@@ -1,0 +1,31 @@
+name: BoardVerse production deploy isolation verification
+
+on:
+  push:
+    branches: [boardverse-prod-deploy-only-v011]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        working-directory: BoardVerse
+        run: npm install --no-audit --no-fund
+      - name: Full regression suite
+        working-directory: BoardVerse
+        run: npm test
+      - name: Production Wrangler dry-run
+        run: npx --yes wrangler@4.127.1 deploy --dry-run --config wrangler.jsonc --outdir /tmp/boardverse-prod-only
+      - name: Preview Wrangler dry-run
+        run: npx --yes wrangler@4.127.1 versions upload --dry-run --config wrangler.preview.jsonc --outdir /tmp/boardverse-preview-only
+      - name: Validate adapter isolation
+        run: |
+          node --check scripts/wrangler-ci.cjs
+          grep -q "production Worker games" scripts/wrangler-ci.cjs
+          grep -q "runReal(\['deploy', '--config', configPath\])" scripts/wrangler-ci.cjs
+          ! grep -q "apiRequest('PUT', '/workers/domains'" scripts/wrangler-ci.cjs
