@@ -7,15 +7,15 @@
   "keep_vars": true,
   "durable_objects": {
     "bindings": [
-      { "name": "ROOMS", "class_name": "GameRoom" },
-      { "name": "GLOBAL_CHAT", "class_name": "GlobalChat" },
-      { "name": "BOARDVERSE_DB_DO", "class_name": "BoardVerseDb" }
+      { "name": "ROOMS", "class_name": "GameRoomV011" },
+      { "name": "GLOBAL_CHAT", "class_name": "GlobalChatV011" },
+      { "name": "BOARDVERSE_DB_DO", "class_name": "BoardVerseDbV011" }
     ]
   },
   "migrations": [
     {
-      "tag": "boardverse-v011-sqlite-do",
-      "new_sqlite_classes": ["GameRoom", "GlobalChat", "BoardVerseDb"]
+      "tag": "boardverse-v011-visible-platform-20260829",
+      "new_sqlite_classes": ["GameRoomV011", "GlobalChatV011", "BoardVerseDbV011"]
     }
   ],
   "triggers": { "crons": ["0 16 * * *"] },
