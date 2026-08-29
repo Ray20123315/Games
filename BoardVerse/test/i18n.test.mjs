@@ -22,7 +22,8 @@ assert.match(i18nDict, /BoardVerse Admin Console/);
 assert.match(decodedI18n, /下載離線回放/);
 assert.match(i18nDict, /Download offline replay/);
 assert.match(entry, /SITE_I18N_SCRIPT/);
-assert.match(entry, /injectSiteI18n/);
+assert.match(entry, /function injectSiteScripts\(source\)/);
+assert.match(entry, /scripts \+= SITE_I18N_SCRIPT/);
 assert.match(entry, /boardverse-site-i18n/);
 if (legacy) {
   assert.match(legacy, /id="languageSelect"/);
