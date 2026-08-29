@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 const wr=await readFile(new URL("../wrangler.jsonc",import.meta.url),"utf8");
+assert.match(wr,/"name"\s*:\s*"crimson-haze-0a4d"/);
 assert.match(wr,/"main"\s*:\s*"src\/index-v011\.js"/);
 assert.doesNotMatch(wr,/"build"\s*:/);
-assert.match(wr,/"pattern"\s*:\s*"xn--gmqt6w03b11v\.ray2025\.com\/\*"/);
-assert.match(wr,/"zone_name"\s*:\s*"ray2025\.com"/);
+assert.doesNotMatch(wr,/xn--gmqt6w03b11v\.ray2025\.com\/\*/,"do not migrate the live hostname to a second Worker Route; deploy the new source into the Worker that already owns the hostname");
 assert.match(wr,/"pattern"\s*:\s*"xn--gmqt6w03b11v\.ray2025\.com"/);
 assert.match(wr,/"custom_domain"\s*:\s*true/);
 assert.match(wr,/BOARDVERSE_DB_DO/);
@@ -15,7 +15,8 @@ assert.doesNotMatch(wr,/"migrations"\s*:/,"production deploy must not start a ne
 assert.doesNotMatch(wr,/"database_id"\s*:\s*"(?:00000000|placeholder|example)/i,"fake D1 UUID must never be committed");
 const buildGate=await readFile(new URL("../build-worker.mjs",import.meta.url),"utf8");
 assert.match(buildGate,/full regression suite/);
-assert.match(buildGate,/Wrangler production dry-run/);
+assert.match(buildGate,/Wrangler live-worker dry-run/);
+assert.match(buildGate,/targetWorker = "crimson-haze-0a4d"/);
 assert.match(buildGate,/"npm", \["test"\]/);
 assert.match(buildGate,/"wrangler",\s*"deploy",\s*"--dry-run"/s);
 const entry=await readFile(new URL("../src/index-v011.js",import.meta.url),"utf8"); assert.match(entry,/from "\.\/index\.js"/); assert.match(entry,/\.\/ui\/piece-theme\.js/); assert.match(entry,/hardenPieceThemeHtml/); assert.match(entry,/withDatabaseEnv/); assert.match(entry,/BoardVerseDb/); assert.match(entry,/query\(mode, sql, binds = \[\]\)/);
