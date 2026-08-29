@@ -15,9 +15,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-          cache-dependency-path: BoardVerse/package-lock.json
-      - run: npm ci
+      - run: npm install --ignore-scripts
       - name: Install browser driver
         run: npm install --no-save --ignore-scripts puppeteer-core@24
       - name: Find Chrome
