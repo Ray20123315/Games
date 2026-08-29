@@ -1,4 +1,4 @@
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "0.1.1";
 export const ROOM_CODE_RE = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
 export const GAME_IDS = Object.freeze(["go9", "go13", "go19", "gomoku", "renju", "xiangqi", "xiangqi_random", "banqi", "qiguo", "chess", "reversi"]);
 export const MAX_JSON_BYTES = 64 * 1024;
