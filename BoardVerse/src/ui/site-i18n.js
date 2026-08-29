@@ -1,6 +1,7 @@
 import { SITE_I18N_DICTIONARY } from "./site-i18n-dict.js";
 import { HOME_SHELL_SCRIPT } from "./home-shell-safe.js";
 import { CREATE_ROOM_ERROR_MODAL_SCRIPT } from "./create-room-error-modal.js";
+import { IDENTITY_BADGE_SCRIPT } from "./identity-badges.js";
 
 export const RESPONSIVE_STYLE = String.raw`<style id="boardverse-responsive">
 @media (max-width:1024px){
@@ -38,7 +39,7 @@ button,.btn,.compact-btn,.compact-select,input,select,textarea{touch-action:mani
 }
 </style>`;
 
-export const SITE_I18N_SCRIPT = RESPONSIVE_STYLE + HOME_SHELL_SCRIPT + CREATE_ROOM_ERROR_MODAL_SCRIPT + String.raw`<script id="boardverse-site-i18n">
+export const SITE_I18N_SCRIPT = RESPONSIVE_STYLE + HOME_SHELL_SCRIPT + CREATE_ROOM_ERROR_MODAL_SCRIPT + IDENTITY_BADGE_SCRIPT + String.raw`<script id="boardverse-site-i18n">
 (function(){
 'use strict';
 var KEY='boardverseLang', SUPPORTED=['zh-Hant','zh-Hans','en'], locale='zh-Hant';

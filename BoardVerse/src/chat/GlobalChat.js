@@ -60,7 +60,17 @@ export class GlobalChat extends DurableObject {
       const enabled = await setting(this.env.BOARDVERSE_DB, "global_chat_enabled", true);
       if (enabled === false) { this.safeSend(ws, { type: "global_error", message: "全局聊天室目前暫停發言。" }); return; }
     }
-    const entry = { id: crypto.randomUUID(), senderId: identity.id, senderKind: identity.kind, name: String(identity.name || "Guest").slice(0, 40), text, at: now };
+    const badge = String(identity.badge || (identity.kind === "guest" ? "訪客" : "會員")).slice(0, 16);
+    const rawName = String(identity.name || "Guest").slice(0, 40);
+    const entry = {
+      id: crypto.randomUUID(), senderId: identity.id, senderKind: identity.kind,
+      name: `${badge} · ${rawName}`,
+      rawName,
+      role: String(identity.role || (identity.kind === "guest" ? "guest" : "member")),
+      badge,
+      level: Number.isFinite(Number(identity.level)) ? Number(identity.level) : null,
+      text, at: now,
+    };
     const messages = (await this.ctx.storage.get("messages")) || [];
     messages.push(entry); if (messages.length > 100) messages.splice(0, messages.length - 100);
     await this.ctx.storage.put("messages", messages);
