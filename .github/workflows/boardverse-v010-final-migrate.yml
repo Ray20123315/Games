@@ -1,0 +1,108 @@
+name: BoardVerse v0.1.0 final candidate
+
+on:
+  push:
+    branches:
+      - boardverse-v010-final
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: boardverse-v010-final
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout candidate
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Migrate staged source payload when present
+        id: migrate
+        shell: bash
+        run: |
+          set -euo pipefail
+          PAYLOAD='BoardVerse/.migration/v010-source.tar.gz.b64'
+          if [ ! -f "$PAYLOAD" ]; then
+            echo 'migrated=0' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo '0b28608a96ce144e28a794e1a6467dad810287fc4812192b6cc8fd8bf9cd88da  BoardVerse/.migration/v010-source.tar.gz.b64' | sha256sum -c -
+          base64 -d "$PAYLOAD" > /tmp/boardverse-v010-source.tar.gz
+          echo '9be8345385a8431b3f73903fba65fa224468b1766cbf53f91d8d8f52d2f47591  /tmp/boardverse-v010-source.tar.gz' | sha256sum -c -
+          tar -xzf /tmp/boardverse-v010-source.tar.gz
+
+          mkdir -p BoardVerse/src/legacy
+          git fetch origin boardverse-full-plan-v010:refs/remotes/origin/boardverse-full-plan-v010
+          git show origin/boardverse-full-plan-v010:BoardVerse/.migration/current-worker-v023.js > BoardVerse/src/legacy/runtime-v023.js
+          echo '8f168113e24472377fec462bf61812e0b765a3707f72f7f6b249a6997e4a23e5  BoardVerse/src/legacy/runtime-v023.js' | sha256sum -c -
+
+          rm -rf BoardVerse/.source BoardVerse/.source-v005 BoardVerse/.migration
+          rm -f BoardVerse/post-build-v*.mjs BoardVerse/sim-v020.mjs
+          echo 'migrated=1' >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        working-directory: BoardVerse
+        run: npm install --ignore-scripts --no-audit --no-fund --package-lock=false
+
+      - name: JavaScript syntax audit
+        working-directory: BoardVerse
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r f; do node --check "$f"; done < <(find src test -type f \( -name '*.js' -o -name '*.mjs' \) | sort)
+
+      - name: Regression tests
+        working-directory: BoardVerse
+        run: |
+          node test/core.test.mjs
+          node test/imports.test.mjs
+          node test/browser-scripts.test.mjs
+          node test/static.test.mjs
+          node test/legacy-preservation.test.mjs
+          python test/schema_test.py
+
+      - name: Source authority assertions
+        working-directory: BoardVerse
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f src/index.js
+          test -f src/legacy/runtime-v023.js
+          test ! -e .source
+          test ! -e .source-v005
+          ! compgen -G 'post-build-v*.mjs' >/dev/null
+          grep -Fq '"main": "src/index.js"' wrangler.jsonc
+          ! grep -Fq 'post-build-v' wrangler.jsonc
+          ! grep -Fq 'build-worker.mjs' package.json
+          echo '8f168113e24472377fec462bf61812e0b765a3707f72f7f6b249a6997e4a23e5  src/legacy/runtime-v023.js' | sha256sum -c -
+
+      - name: Wrangler bundle dry-run
+        working-directory: BoardVerse
+        run: npx wrangler deploy --dry-run --outdir dist --config wrangler.jsonc
+
+      - name: Clean generated files
+        shell: bash
+        run: rm -rf BoardVerse/node_modules BoardVerse/dist BoardVerse/.wrangler BoardVerse/package-lock.json
+
+      - name: Commit verified source-only candidate
+        if: steps.migrate.outputs.migrated == '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A BoardVerse
+          git diff --cached --quiet && exit 0
+          git commit -m 'BoardVerse v0.1.0: modular platform integration'
+          git push origin HEAD:boardverse-v010-final
