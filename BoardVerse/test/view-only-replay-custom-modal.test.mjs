@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import vm from "node:vm";
 
 const source = await readFile(new URL("../src/index-v016.js", import.meta.url), "utf8");
 const v015 = await readFile(new URL("../src/index-v015.js", import.meta.url), "utf8");
@@ -31,12 +32,24 @@ assert.match(source, /async sendReplay\(ws, token, replayId\)/);
 assert.match(source, /payload\?\.type === "replay_data"/);
 assert.match(source, /payload = \{ \.\.\.payload, replay: \{ \.\.\.payload\.replay, interruptions \} \}/);
 assert.match(source, /delta-overlapMs\(from,to,data\.interruptions\)/);
+assert.match(source, /parts\.sort/);
 assert.match(source, /Math\.round\(base\/speed\(\)\)/);
 assert.match(source, /dialog\.appendChild\(bar\)/);
 assert.match(source, /bar\.appendChild\(controls\)/);
 assert.match(source, /location\.href='\/admin\/replay\/'/);
 assert.match(source, /players\.map/);
 assert.match(source, /result&&result\.winnerName/);
+
+function embeddedScript(name) {
+  const start = source.indexOf(`const ${name} = String.raw\`<script`);
+  assert.ok(start >= 0, `missing embedded script ${name}`);
+  const bodyStart = source.indexOf(">", start) + 1;
+  const bodyEnd = source.indexOf("</script>`;", bodyStart);
+  assert.ok(bodyStart > start && bodyEnd > bodyStart, `invalid embedded script boundary ${name}`);
+  return source.slice(bodyStart, bodyEnd);
+}
+new vm.Script(embeddedScript("REPLAY_PLAYER_SCRIPT"), { filename: "room-replay-player.js" });
+new vm.Script(embeddedScript("ADMIN_REPLAY_SCRIPT"), { filename: "admin-readable-replay.js" });
 
 assert.match(runtime, /const MAX_REPLAY_HISTORY = 12/);
 assert.match(runtime, /member && member\.role !== "pending" \? room\.replays\.slice\(-MAX_REPLAY_HISTORY\)/);
