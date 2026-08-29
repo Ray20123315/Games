@@ -1,4 +1,4 @@
-name: Simulate BoardVerse v0.0.24
+name: Verify BoardVerse v0.0.24
 on:
   push:
     branches: [feature/game-variants-opening-allocation-v0.0.24]
@@ -10,7 +10,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build current worker
+      - name: Build formal v0.0.24
         working-directory: BoardVerse
         run: |
           node build-worker.mjs
@@ -29,27 +29,28 @@ jobs:
           node post-build-v021.mjs
           node post-build-v022.mjs
           node post-build-v023.mjs
-      - name: Simulate v0.0.24
-        working-directory: BoardVerse
-        run: |
-          node sim-v024-compat.mjs
-          node sim-v024.mjs
+          node post-build-v024.mjs
           node --check worker.js
-      - name: Preserve finalized v0.0.24 patch source
-        uses: actions/upload-artifact@v4
-        with:
-          name: v024-finalized-patch-source
-          path: BoardVerse/sim-v024.mjs
-      - name: Verify v0.0.24 markers and hidden-state safety
+      - name: Verify v0.0.24 output and hidden-state safety
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
           import {createHash} from 'node:crypto';
           const s=await readFile('worker.js','utf8');
-          const markers=['const APP_VERSION = "0.0.24";','GAME_CATALOG.banqi','GAME_CATALOG.xiangqi_random','function applyBanqi(','secretParity','publicOpening(room)','opening_guess','opening_hand','roomTimingText(r)','renderBanqi(g,el,interactive)'];
+          const hash=createHash('sha256').update(s).digest('hex');
+          if(Buffer.byteLength(s)!==227802) throw new Error('v024 byte count mismatch '+Buffer.byteLength(s));
+          if(hash!=='bf661f6d7f09c21742d0d75fd2cda4825d270136ef5a64d70399c69769ee2ed7') throw new Error('v024 hash mismatch '+hash);
+          const markers=['const APP_VERSION = "0.0.24";','GAME_CATALOG.banqi','GAME_CATALOG.xiangqi_random','function applyBanqi(','opening_guess','opening_choose','opening_hand','roomTimingText(r)','renderBanqi(g,el,interactive)','if (out?.type === "banqi" && Array.isArray(out.covered))'];
           for(const m of markers) if(!s.includes(m)) throw new Error('missing '+m);
-          if(!s.includes('if (out?.type === "banqi" && Array.isArray(out.covered))')) throw new Error('banqi masking missing');
-          console.log('V024_BYTES='+Buffer.byteLength(s));
-          console.log('V024_SHA256='+createHash('sha256').update(s).digest('hex'));
+          const a=s.indexOf('function publicOpening(room)');
+          const b=s.indexOf('function visibleMemberSide',a);
+          if(a<0||b<0) throw new Error('publicOpening block missing');
+          const block=s.slice(a,b);
+          for(const secret of ['secretParity','leftSide','rightSide']) if(block.includes(secret)) throw new Error('opening secret leaked: '+secret);
+          console.log('FINAL_V024_BYTES='+Buffer.byteLength(s));
+          console.log('FINAL_V024_SHA256='+hash);
           NODE
+      - name: Reproduce Cloudflare root deploy command safely
+        run: |
+          npx --yes wrangler@4.127.1 versions upload --dry-run
