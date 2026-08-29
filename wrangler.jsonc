@@ -1,5 +1,5 @@
 {
-  "name": "crimson-haze-0a4d",
+  "name": "games",
   "main": "BoardVerse/src/index-v011.js",
   "compatibility_date": "2026-08-28",
   "routes": [
@@ -29,8 +29,9 @@
     "TURNSTILE_HOSTNAMES": "xn--gmqt6w03b11v.ray2025.com,多人棋室.ray2025.com"
   }
 
-  // Root-level mirror for Cloudflare Workers Builds, which currently invokes
-  // Wrangler from the repository root. Canonical application source remains
-  // under BoardVerse/. Keep this file aligned with BoardVerse/wrangler.jsonc.
+  // Cloudflare Workers Builds is currently connected to Worker "games" and
+  // invokes Wrangler from the repository root. This adapter keeps that CI path
+  // working while the canonical BoardVerse project config remains in
+  // BoardVerse/wrangler.jsonc. Application source is still BoardVerse/.
   // BOARDVERSE_DB remains external until the real D1 UUID is configured.
 }
