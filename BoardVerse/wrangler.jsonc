@@ -1,11 +1,8 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "crimson-haze-0a4d",
-  "main": "worker.js",
+  "main": "src/index.js",
   "compatibility_date": "2026-08-28",
-  "build": {
-    "command": "node build-worker.mjs && node post-build-v009.mjs && node post-build-v010.mjs && node post-build-v011.mjs && node post-build-v012.mjs && node post-build-v013.mjs && node post-build-v014.mjs && node post-build-v015.mjs && node post-build-v016.mjs && node post-build-v017.mjs && node post-build-v018.mjs && node post-build-v019.mjs && node post-build-v020.mjs && node post-build-v021.mjs && node post-build-v022.mjs && node post-build-v023.mjs"
-  },
   "routes": [
     {
       "pattern": "xn--gmqt6w03b11v.ray2025.com",
@@ -14,16 +11,23 @@
   ],
   "durable_objects": {
     "bindings": [
-      {
-        "name": "ROOMS",
-        "class_name": "GameRoom"
-      }
+      { "name": "ROOMS", "class_name": "GameRoom" },
+      { "name": "GLOBAL_CHAT", "class_name": "GlobalChat" }
     ]
   },
   "exports": {
-    "GameRoom": {
-      "type": "durable-object",
-      "storage": "sqlite"
-    }
+    "GameRoom": { "type": "durable-object", "storage": "sqlite" },
+    "GlobalChat": { "type": "durable-object", "storage": "sqlite" }
+  },
+  "triggers": {
+    "crons": ["0 16 * * *"]
+  },
+  "observability": {
+    "enabled": true
   }
+
+  // BOARDVERSE_DB intentionally is not declared here until the real Cloudflare
+  // D1 resource exists. Cloudflare requires binding + database_name + database_id.
+  // Required production binding: BOARDVERSE_DB -> D1 database "boardverse".
+  // Do not replace this with a fabricated UUID.
 }
