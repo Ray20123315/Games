@@ -4,9 +4,9 @@ import { withDatabaseEnv } from "./core/db.js";
 import { BoardVerseDb } from "./db/BoardVerseDb.js";
 import { hardenPieceThemeHtml } from "./ui/piece-theme.js";
 
-export { BoardVerseDb };
+export class BoardVerseDbV011 extends BoardVerseDb {}
 
-export class GameRoom extends AppGameRoom {
+export class GameRoomV011 extends AppGameRoom {
   constructor(ctx, env) {
     const effectiveEnv = withDatabaseEnv(env);
     super(ctx, effectiveEnv);
@@ -14,7 +14,7 @@ export class GameRoom extends AppGameRoom {
   }
 }
 
-export class GlobalChat extends AppGlobalChat {
+export class GlobalChatV011 extends AppGlobalChat {
   constructor(ctx, env) {
     const effectiveEnv = withDatabaseEnv(env);
     super(ctx, effectiveEnv);
