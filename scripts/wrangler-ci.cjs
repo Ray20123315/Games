@@ -85,16 +85,18 @@ function productionConfig(databaseId) {
 (async () => {
   console.log(`[boardverse-ci] adapter active; branch=${branch || '(unknown)'}; production=${isProduction}`);
 
-  // Read-only discovery on preview builds proves that the build token can see
-  // the existing production bindings without ever printing database IDs.
   let gamesSettings = null;
+  let legacySettings = null;
   if (isWorkersBuild) {
     gamesSettings = await settings('games');
     const gamesDb = d1Binding(gamesSettings);
     console.log(`[boardverse-ci] games BOARDVERSE_DB binding: ${gamesDb ? 'present' : 'absent'}`);
     if (!gamesDb) {
-      const legacySettings = await settings('crimson-haze-0a4d');
+      legacySettings = await settings('crimson-haze-0a4d');
       console.log(`[boardverse-ci] legacy BOARDVERSE_DB binding: ${d1Binding(legacySettings) ? 'present' : 'absent'}`);
+    }
+    if (!gamesDb && !d1Binding(legacySettings)) {
+      throw new Error('BOARDVERSE_DB binding is not discoverable on games or crimson-haze-0a4d; refusing to publish a build with broken registration/admin/report persistence.');
     }
   }
 
@@ -103,13 +105,9 @@ function productionConfig(databaseId) {
     process.exit(status);
   }
 
-  let db = d1Binding(gamesSettings);
-  if (!db) {
-    const legacySettings = await settings('crimson-haze-0a4d');
-    db = d1Binding(legacySettings);
-  }
+  const db = d1Binding(gamesSettings) || d1Binding(legacySettings || await settings('crimson-haze-0a4d'));
   if (!db?.database_id) {
-    throw new Error('BOARDVERSE_DB binding is not discoverable on games or crimson-haze-0a4d; refusing to deploy a broken registration/admin build.');
+    throw new Error('BOARDVERSE_DB database_id was not available after binding discovery.');
   }
 
   const configPath = productionConfig(db.database_id);
