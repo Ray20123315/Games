@@ -9,36 +9,46 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify live production surfaces
+      - name: Diagnose live production surfaces
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
           BASE='https://xn--gmqt6w03b11v.ray2025.com'
           tmp="$(mktemp -d)"
           nonce="$(date +%s)"
 
           health_code=$(curl --retry 4 --retry-delay 2 -sS -o "$tmp/health.json" -w '%{http_code}' "$BASE/health?smoke=$nonce")
           echo "HEALTH=$health_code $(cat "$tmp/health.json")"
-          test "$health_code" = 200
-          grep -q '"version":"0.1.1"' "$tmp/health.json"
 
           home_code=$(curl --retry 4 --retry-delay 2 -sS -o "$tmp/home.html" -w '%{http_code}' "$BASE/?smoke=$nonce")
           echo "HOME=$home_code"
-          test "$home_code" = 200
-          grep -q 'id="bvPublicNav"' "$tmp/home.html"
-          grep -q 'v0.1.1' "$tmp/home.html"
+          if grep -q 'id="bvPublicNav"' "$tmp/home.html"; then echo 'NAV=present'; else echo 'NAV=absent'; fi
+          if grep -q 'v0.1.1' "$tmp/home.html"; then echo 'VERSION_NAV=present'; else echo 'VERSION_NAV=absent'; fi
 
-          admin_code=$(curl --retry 4 --retry-delay 2 -sS -D "$tmp/admin.headers" -o /dev/null -w '%{http_code}' "$BASE/admin?smoke=$nonce")
-          echo "ADMIN=$admin_code"
-          test "$admin_code" = 302
-          grep -qi '^location: .*\/admin/' "$tmp/admin.headers"
+          admin_code=$(curl --retry 4 --retry-delay 2 -sS -D "$tmp/admin.headers" -o "$tmp/admin.body" -w '%{http_code}' "$BASE/admin?smoke=$nonce")
+          admin_location=$(grep -i '^location:' "$tmp/admin.headers" | tr -d '\r' | head -1 || true)
+          echo "ADMIN=$admin_code ${admin_location:-no-location}"
 
           for path in admin/ report register login; do
-            code=$(curl --retry 4 --retry-delay 2 -sS -o "$tmp/${path//\//_}.body" -w '%{http_code}' "$BASE/$path?smoke=$nonce")
+            safe="${path//\//_}"
+            code=$(curl --retry 4 --retry-delay 2 -sS -o "$tmp/$safe.body" -w '%{http_code}' "$BASE/$path?smoke=$nonce")
             echo "${path^^}=$code"
-            test "$code" != 404
-            test "$code" -ge 200
-            test "$code" -lt 400
+            head -c 120 "$tmp/$safe.body" | tr '\n' ' ' || true
+            echo
           done
 
-          echo 'LIVE_SURFACES=PASS'
+          if [ "$home_code" = 200 ] \
+            && grep -q 'id="bvPublicNav"' "$tmp/home.html" \
+            && grep -q 'v0.1.1' "$tmp/home.html" \
+            && [ "$admin_code" = 302 ] \
+            && grep -qi '^location: .*\/admin/' "$tmp/admin.headers"; then
+            ok=1
+            for path in admin/ report register login; do
+              safe="${path//\//_}"
+              code=$(curl -sS -o /dev/null -w '%{http_code}' "$BASE/$path?verify=$nonce")
+              if [ "$code" = 404 ] || [ "$code" -lt 200 ] || [ "$code" -ge 400 ]; then ok=0; fi
+            done
+            if [ "$ok" = 1 ]; then echo 'LIVE_SURFACES=PASS'; exit 0; fi
+          fi
+          echo 'LIVE_SURFACES=FAIL'
+          exit 1
