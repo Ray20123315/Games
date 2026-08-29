@@ -70,6 +70,9 @@ function productionConfig(databaseId) {
     compatibility_date: '2026-08-28',
     workers_dev: false,
     keep_vars: true,
+    routes: [
+      { pattern: 'xn--gmqt6w03b11v.ray2025.com', custom_domain: true },
+    ],
     durable_objects: {
       bindings: [
         { name: 'ROOMS', class_name: 'GameRoom' },
@@ -112,6 +115,7 @@ function productionConfig(databaseId) {
 
   const configPath = productionConfig(db?.database_id || null);
   console.log(`[boardverse-ci] production database backend: ${db?.database_id ? 'D1 + existing GameRoom fallback' : 'existing GameRoom SQLite fallback'}`);
+  console.log('[boardverse-ci] attaching custom domain xn--gmqt6w03b11v.ray2025.com to games.');
   process.exit(runReal(['deploy', '--config', configPath]));
 })().catch((error) => {
   console.error(`[boardverse-ci] ${error.stack || error.message}`);
