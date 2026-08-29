@@ -7,7 +7,6 @@ const os = require('node:os');
 const path = require('node:path');
 
 const REAL_WRANGLER = 'wrangler@4.127.1';
-const PROD_HOSTNAME = 'xn--gmqt6w03b11v.ray2025.com';
 const branch = process.env.WORKERS_CI_BRANCH || '';
 const isWorkersBuild = process.env.WORKERS_CI === '1';
 const isProduction = isWorkersBuild && branch === 'main';
@@ -22,17 +21,13 @@ function runReal(args) {
   return result.status == null ? 1 : result.status;
 }
 
-async function apiRequest(method, pathname, payload = undefined) {
+async function api(pathname) {
   const token = process.env.CLOUDFLARE_API_TOKEN;
   const account = process.env.CLOUDFLARE_ACCOUNT_ID;
   if (!token || !account) throw new Error('Workers Builds did not expose CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID to the deploy process.');
-  const headers = { Authorization: `Bearer ${token}` };
-  const options = { method, headers };
-  if (payload !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    options.body = JSON.stringify(payload);
-  }
-  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}${pathname}`, options);
+  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}${pathname}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
   const body = await res.json().catch(() => null);
   if (!res.ok || !body?.success) {
     const message = body?.errors?.map((x) => x.message).filter(Boolean).join('; ') || `HTTP ${res.status}`;
@@ -40,8 +35,6 @@ async function apiRequest(method, pathname, payload = undefined) {
   }
   return body.result;
 }
-
-const api = (pathname) => apiRequest('GET', pathname);
 
 async function settings(worker) {
   try {
@@ -99,24 +92,6 @@ function productionConfig(databaseId) {
   return file;
 }
 
-async function attachProductionDomain() {
-  const result = await apiRequest('PUT', '/workers/domains', {
-    hostname: PROD_HOSTNAME,
-    service: 'games',
-    zone_name: 'ray2025.com',
-  });
-  if (result?.hostname !== PROD_HOSTNAME || result?.service !== 'games') {
-    throw new Error('Cloudflare custom-domain API returned an unexpected binding.');
-  }
-  const domains = await api(`/workers/domains?hostname=${encodeURIComponent(PROD_HOSTNAME)}`);
-  const rows = Array.isArray(domains) ? domains : [];
-  const live = rows.find((item) => item?.hostname === PROD_HOSTNAME);
-  if (!live || live.service !== 'games') {
-    throw new Error('Custom-domain read-back did not confirm games as the live service.');
-  }
-  console.log(`[boardverse-ci] custom domain attached and verified: ${PROD_HOSTNAME} -> games`);
-}
-
 (async () => {
   console.log(`[boardverse-ci] adapter active; branch=${branch || '(unknown)'}; production=${isProduction}`);
 
@@ -137,10 +112,8 @@ async function attachProductionDomain() {
 
   const configPath = productionConfig(db?.database_id || null);
   console.log(`[boardverse-ci] production database backend: ${db?.database_id ? 'D1 + existing GameRoom fallback' : 'existing GameRoom SQLite fallback'}`);
-  const deployStatus = runReal(['deploy', '--config', configPath]);
-  if (deployStatus !== 0) process.exit(deployStatus);
-  await attachProductionDomain();
-  process.exit(0);
+  console.log('[boardverse-ci] deploying BoardVerse v0.1.1 to production Worker games');
+  process.exit(runReal(['deploy', '--config', configPath]));
 })().catch((error) => {
   console.error(`[boardverse-ci] ${error.stack || error.message}`);
   process.exit(1);
