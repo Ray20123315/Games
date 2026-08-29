@@ -32,15 +32,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PAYLOAD='BoardVerse/.migration/v010-source.tar.gz.b64'
-          if [ ! -f "$PAYLOAD" ]; then
+          PREFIX1='BoardVerse/.migration/v010-source-prefix.001.b64'
+          if [ ! -f "$PREFIX1" ]; then
             echo 'migrated=0' >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          PREFIX_BYTES=16121
+          # Rebuild exclusively from small blobs whose Git blob SHAs were
+          # verified against the local source payload. Do not use the original
+          # connector-truncated file at all.
           REBUILT='/tmp/boardverse-v010-source.tar.gz.b64'
-          head -c "$PREFIX_BYTES" "$PAYLOAD" > "$REBUILT"
+          : > "$REBUILT"
+          for n in 001 002 003 004; do
+            PART="BoardVerse/.migration/v010-source-prefix.${n}.b64"
+            test -f "$PART"
+            cat "$PART" >> "$REBUILT"
+          done
           cat BoardVerse/.migration/v010-source-tail.001.b64 >> "$REBUILT"
           cat BoardVerse/.migration/v010-source-tail.002a.b64 >> "$REBUILT"
           cat BoardVerse/.migration/v010-source-tail.002b.b64 >> "$REBUILT"
@@ -63,7 +70,7 @@ jobs:
           echo '8f168113e24472377fec462bf61812e0b765a3707f72f7f6b249a6997e4a23e5  BoardVerse/src/legacy/runtime-v023.js' | sha256sum -c -
 
           rm -rf BoardVerse/.source BoardVerse/.source-v005 BoardVerse/.migration
-          rm -f BoardVerse/post-build-v*.mjs BoardVerse/sim-v020.mjs
+          rm -f BoardVerse/build-worker.mjs BoardVerse/post-build-v*.mjs BoardVerse/sim-v020.mjs
           echo 'migrated=1' >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
@@ -96,6 +103,7 @@ jobs:
           test -f src/legacy/runtime-v023.js
           test ! -e .source
           test ! -e .source-v005
+          test ! -e build-worker.mjs
           ! compgen -G 'post-build-v*.mjs' >/dev/null
           grep -Fq '"main": "src/index.js"' wrangler.jsonc
           ! grep -Fq 'post-build-v' wrangler.jsonc
