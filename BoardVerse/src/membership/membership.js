@@ -1,5 +1,6 @@
 import { GP_RULES, MEMBERSHIP_LEVELS, TAIPEI_TIME_ZONE } from "../core/config.js";
 import { all, first, run } from "../core/db.js";
+import { effectiveMembership, isOwnerUser, maxMembershipPolicy } from "../auth/identity.js";
 
 export function taipeiDateKey(now = Date.now()) {
   const parts = new Intl.DateTimeFormat("en-CA", { timeZone: TAIPEI_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(now));
@@ -18,19 +19,22 @@ export function levelPolicy(level) {
 }
 
 export async function getUserMembership(db, userId) {
-  const row = await first(db, "SELECT id,gp,level,reputation,unlimited_custom_room_id,custom_room_suspended_until,email_verified_at,status,suspended_until FROM users WHERE id=?", userId);
+  const row = await first(db, "SELECT id,gp,level,reputation,unlimited_custom_room_id,custom_room_suspended_until,email_verified_at,status,suspended_until,password_algorithm,email_normalized FROM users WHERE id=?", userId);
   if (!row) return null;
-  return { ...row, policy: levelPolicy(row.level), levelInfo: levelPolicy(row.level) };
+  const membership = { ...row, policy: levelPolicy(row.level), levelInfo: levelPolicy(row.level) };
+  return effectiveMembership(row, membership);
 }
 
 async function updateNaturalLevel(db, userId) {
-  const user = await first(db, "SELECT gp,level FROM users WHERE id=?", userId);
-  if (!user) return;
+  const user = await first(db, "SELECT gp,level,password_algorithm,email_normalized FROM users WHERE id=?", userId);
+  if (!user || isOwnerUser(user)) return;
   const natural = levelForGp(user.gp).level;
   if (natural > Number(user.level || 1)) await run(db, "UPDATE users SET level=?,updated_at=? WHERE id=?", natural, Date.now(), userId);
 }
 
 export async function addGp(db, userId, amount, reason = "system") {
+  const owner = await first(db, "SELECT password_algorithm,email_normalized FROM users WHERE id=?", userId);
+  if (isOwnerUser(owner)) return;
   const n = Math.trunc(Number(amount) || 0);
   if (!n) return;
   await run(db, "UPDATE users SET gp=MAX(0,gp+?),updated_at=? WHERE id=?", n, Date.now(), userId);
@@ -40,8 +44,12 @@ export async function addGp(db, userId, amount, reason = "system") {
 
 export async function checkIn(db, userId, now = Date.now()) {
   const dateKey = taipeiDateKey(now);
-  const user = await first(db, "SELECT email_verified_at,status,suspended_until,gp,level FROM users WHERE id=?", userId);
+  const user = await first(db, "SELECT email_verified_at,status,suspended_until,gp,level,password_algorithm,email_normalized FROM users WHERE id=?", userId);
   if (!user?.email_verified_at || user.status !== "active") throw new Error("帳號尚未完成 Email 驗證或目前不可使用。");
+  if (isOwnerUser(user)) {
+    const max = maxMembershipPolicy();
+    return { already: true, awarded: 0, dateKey, streak: 0, gp: max.gp, level: max.level, maxed: true, owner: true };
+  }
   const old = await first(db, "SELECT last_checkin_date,streak_days FROM user_checkin_state WHERE user_id=?", userId);
   if (old?.last_checkin_date === dateKey) return { already: true, awarded: 0, dateKey, streak: old.streak_days, gp: user.gp, level: user.level };
   const yesterday = taipeiDateKey(now - 24 * 60 * 60 * 1000);
@@ -58,6 +66,8 @@ export async function checkIn(db, userId, now = Date.now()) {
 }
 
 export async function noteActivity(db, userId, now = Date.now()) {
+  const owner = await first(db, "SELECT password_algorithm,email_normalized FROM users WHERE id=?", userId);
+  if (isOwnerUser(owner)) return { seconds: 0, awarded: 0, maxed: true, owner: true };
   const dateKey = taipeiDateKey(now);
   const row = await first(db, "SELECT active_seconds,active_gp_awarded,last_activity_at FROM daily_user_stats WHERE user_id=? AND date_key=?", userId, dateKey);
   const oldSeconds = Number(row?.active_seconds || 0);
@@ -76,6 +86,7 @@ export async function noteActivity(db, userId, now = Date.now()) {
 export async function canCreateCustomRoom(db, user) {
   if (!user?.email_verified_at || user.status !== "active") return { ok: false, reason: "請先登入已驗證帳號。" };
   if (Number(user.custom_room_suspended_until || 0) > Date.now()) return { ok: false, reason: "自訂房號權限目前被暫停。" };
+  if (isOwnerUser(user)) return { ok: true, unlimited: true, owner: true, policy: maxMembershipPolicy() };
   if (user.unlimited_custom_room_id) return { ok: true, unlimited: true, policy: levelPolicy(user.level) };
   const policy = levelPolicy(user.level);
   if (policy.customRoomsPerDay == null) return { ok: true, unlimited: true, policy };
@@ -96,7 +107,7 @@ export async function listPresets(db, userId) {
 }
 
 export async function savePreset(db, user, { id = null, name, config }) {
-  const policy = levelPolicy(user.level);
+  const policy = isOwnerUser(user) ? maxMembershipPolicy() : levelPolicy(user.level);
   const cleanName = String(name || "").trim().slice(0, 40);
   if (!cleanName) throw new Error("Preset 名稱不能空白。");
   const safe = stripPresetSecrets(structuredClone(config || {}));
@@ -119,8 +130,9 @@ export async function deletePreset(db, userId, presetId) {
 
 export async function awardGameGp(db, { userId, opponentUserId, outcome, finishedNormally = true, durationMs = null, now = Date.now() }) {
   if (!finishedNormally || !userId) return { awarded: 0, eligible: false };
-  const user = await first(db, "SELECT id,email_verified_at,status FROM users WHERE id=?", userId);
+  const user = await first(db, "SELECT id,email_verified_at,status,password_algorithm,email_normalized FROM users WHERE id=?", userId);
   if (!user?.email_verified_at || user.status !== "active") return { awarded: 0, eligible: false };
+  if (isOwnerUser(user)) return { awarded: 0, eligible: false, reason: "owner_maxed", maxed: true };
   const dateKey = taipeiDateKey(now);
   const stats = await first(db, "SELECT valid_games_count FROM daily_user_stats WHERE user_id=? AND date_key=?", userId, dateKey);
   if (Number(stats?.valid_games_count || 0) >= GP_RULES.gamesDailyMax) return { awarded: 0, eligible: false, reason: "daily_cap" };
@@ -152,7 +164,6 @@ async function maybeRiskFlag(db, userId, type, evidence) {
   if (recent) return;
   await run(db, "INSERT INTO risk_flags(id,user_id,type,severity_hint,evidence_json,status,created_at,reviewed_at) VALUES(?,?,?,?,?,'open',?,NULL)", crypto.randomUUID(), userId, type, "medium", JSON.stringify(evidence), Date.now());
 }
-
 
 function stripPresetSecrets(value) {
   const forbidden = new Set(["roomid","customroomcode","password","returnpassword","session","token","email","admin","secret","authorization"]);
