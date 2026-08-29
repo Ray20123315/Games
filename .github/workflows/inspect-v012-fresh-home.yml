@@ -1,0 +1,52 @@
+name: Inspect v0.1.2 fresh homepage
+on:
+  push:
+    branches: [feat/admin-workbench-v0.1.2]
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: BoardVerse
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: BoardVerse/package-lock.json
+      - run: npm ci
+      - name: Install browser driver
+        run: npm install --no-save --ignore-scripts puppeteer-core@24
+      - name: Find Chrome
+        run: |
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME"
+          echo "CHROME=$CHROME" >> "$GITHUB_ENV"
+          "$CHROME" --version
+      - name: Inspect production HTTP
+        run: |
+          curl -fsS -D /tmp/prod.headers -o /tmp/prod.html --max-time 20 https://xn--gmqt6w03b11v.ray2025.com/
+          head -40 /tmp/prod.headers
+          echo "prod_bytes=$(wc -c < /tmp/prod.html)"
+          grep -o 'v0\.[0-9][0-9.]*' /tmp/prod.html | head || true
+      - name: Fresh Chrome against production
+        env:
+          TARGET_URL: https://xn--gmqt6w03b11v.ray2025.com/
+        run: node test/fresh-home-inspect.mjs
+      - name: Start local Worker
+        run: |
+          npx wrangler dev --local --port 8787 > /tmp/wrangler.log 2>&1 &
+          echo $! > /tmp/wrangler.pid
+          for i in $(seq 1 40); do curl -fsS http://127.0.0.1:8787/ >/dev/null 2>&1 && exit 0; sleep 1; done
+          cat /tmp/wrangler.log
+          exit 1
+      - name: Fresh Chrome against branch Worker
+        env:
+          TARGET_URL: http://127.0.0.1:8787/
+        run: node test/fresh-home-inspect.mjs
+      - name: Wrangler log
+        if: always()
+        run: tail -100 /tmp/wrangler.log 2>/dev/null || true
