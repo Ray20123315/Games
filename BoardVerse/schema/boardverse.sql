@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS disciplinary_actions (
 );
 CREATE INDEX IF NOT EXISTS idx_discipline_user ON disciplinary_actions(user_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS audit_logs (
- id TEXT PRIMARY KEY, admin_actor TEXT NOT NULL, action_type TEXT, target_type TEXT, target_id TEXT, reason TEXT,
+ id TEXT PRIMARY KEY, admin_actor TEXT NOT NULL, action_type TEXT NOT NULL, target_type TEXT, target_id TEXT, reason TEXT,
  before_json TEXT, after_json TEXT, created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
