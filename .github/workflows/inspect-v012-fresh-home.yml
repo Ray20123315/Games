@@ -30,10 +30,27 @@ jobs:
           head -40 /tmp/prod.headers
           echo "prod_bytes=$(wc -c < /tmp/prod.html)"
           grep -o 'v0\.[0-9][0-9.]*' /tmp/prod.html | head || true
+          node test/make-home-variants.mjs
       - name: Fresh Chrome against production
+        continue-on-error: true
         env:
           TARGET_URL: https://xn--gmqt6w03b11v.ray2025.com/
-        run: node test/fresh-home-inspect.mjs
+        run: timeout 35s node test/fresh-home-inspect.mjs
+      - name: Serve isolated production variants
+        run: |
+          cd /tmp
+          python3 -m http.server 8123 >/tmp/static.log 2>&1 &
+          echo $! >/tmp/static.pid
+          sleep 1
+      - name: Identify locking script layer
+        run: |
+          set +e
+          for variant in no-bridge no-legacy no-enhance no-i18n no-policy no-pause; do
+            echo "===== $variant ====="
+            TARGET_URL="http://127.0.0.1:8123/prod-$variant.html" timeout 22s node test/fresh-home-inspect.mjs
+            echo "exit=$?"
+          done
+          exit 0
       - name: Start local Worker
         run: |
           npx wrangler dev --local --port 8787 > /tmp/wrangler.log 2>&1 &
@@ -42,9 +59,10 @@ jobs:
           cat /tmp/wrangler.log
           exit 1
       - name: Fresh Chrome against branch Worker
+        continue-on-error: true
         env:
           TARGET_URL: http://127.0.0.1:8787/
-        run: node test/fresh-home-inspect.mjs
+        run: timeout 35s node test/fresh-home-inspect.mjs
       - name: Wrangler log
         if: always()
         run: tail -100 /tmp/wrangler.log 2>/dev/null || true
