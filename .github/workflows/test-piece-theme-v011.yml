@@ -1,0 +1,33 @@
+name: Verify BoardVerse v0.1.1 piece theme isolation
+on:
+  push:
+    branches: [fix/piece-theme-v0.1.1-r2]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        working-directory: BoardVerse
+        run: npm install --no-audit --no-fund
+      - name: Full test suite
+        working-directory: BoardVerse
+        run: npm test
+      - name: Chrome computed-style theme isolation
+        working-directory: BoardVerse
+        run: |
+          node --input-type=module <<'NODE'
+          import { writeFile } from 'node:fs/promises';
+          import { PIECE_THEME_STYLE } from './src/ui/piece-theme.js';
+          const html=`<!doctype html><meta charset="utf-8">${PIECE_THEME_STYLE}<style>body.page-theme-black{color-scheme:dark}body.page-theme-white{color-scheme:light}.board{display:block}.stone{width:30px;height:30px}.qiguo-piece{display:inline-block}</style><body><div id="board" class="board"><div id="stone" class="stone white"></div><span id="chess" class="chess-piece white">♔</span><span id="qiguo" class="qiguo-piece" style="background:#f2eee3!important;color:#17130b!important">秦</span></div><pre id="out"></pre><script>function snap(cls){document.body.className=cls;let d=getComputedStyle(board),a=getComputedStyle(stone),b=getComputedStyle(chess),c=getComputedStyle(qiguo);return{theme:cls,boardScheme:d.colorScheme,stoneBg:a.backgroundColor,stoneImage:a.backgroundImage,chessColor:b.color,chessFill:b.webkitTextFillColor,qiguoBg:c.backgroundColor,qiguoColor:c.color}}let x=[snap('page-theme-white'),snap('page-theme-black')];out.textContent=JSON.stringify(x);let a=JSON.stringify(x[0]).replace('page-theme-white','same'),b=JSON.stringify(x[1]).replace('page-theme-black','same');if(a!==b)document.body.dataset.bad='1';</script></body>`;
+          await writeFile('piece-theme-browser-test.html',html);
+          NODE
+          google-chrome --headless --no-sandbox --disable-gpu --dump-dom file://$PWD/piece-theme-browser-test.html > piece-theme-browser-dump.html 2>/dev/null
+          grep '<pre id="out">' piece-theme-browser-dump.html
+          ! grep -q 'data-bad="1"' piece-theme-browser-dump.html
+      - name: Wrangler dry run
+        working-directory: BoardVerse
+        run: npx wrangler@4.127.1 deploy --dry-run --outdir dist --config wrangler.jsonc
