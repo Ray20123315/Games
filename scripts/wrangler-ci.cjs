@@ -10,6 +10,7 @@ const REAL_WRANGLER = 'wrangler@4.127.1';
 const PROD_HOSTNAME = 'xn--gmqt6w03b11v.ray2025.com';
 const PROD_SERVICE = 'games';
 const PROD_ZONE = 'ray2025.com';
+const PROD_ROUTE = `${PROD_HOSTNAME}/*`;
 const branch = process.env.WORKERS_CI_BRANCH || '';
 const commitSha = process.env.WORKERS_CI_COMMIT_SHA || '';
 const isWorkersBuild = process.env.WORKERS_CI === '1';
@@ -25,17 +26,22 @@ function runReal(args) {
   return result.status == null ? 1 : result.status;
 }
 
-async function apiRequest(method, pathname, payload = undefined) {
+function credentials() {
   const token = process.env.CLOUDFLARE_API_TOKEN;
   const account = process.env.CLOUDFLARE_ACCOUNT_ID;
   if (!token || !account) throw new Error('Workers Builds did not expose CLOUDFLARE_API_TOKEN/CLOUDFLARE_ACCOUNT_ID to the deploy process.');
+  return { token, account };
+}
+
+async function cfRequest(method, pathname, payload = undefined) {
+  const { token } = credentials();
   const headers = { Authorization: `Bearer ${token}` };
   const options = { method, headers };
   if (payload !== undefined) {
     headers['Content-Type'] = 'application/json';
     options.body = JSON.stringify(payload);
   }
-  const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${account}${pathname}`, options);
+  const res = await fetch(`https://api.cloudflare.com/client/v4${pathname}`, options);
   const body = await res.json().catch(() => null);
   if (!res.ok || !body?.success) {
     const message = body?.errors?.map((x) => `${x.code ? `${x.code}: ` : ''}${x.message}`).filter(Boolean).join('; ') || `HTTP ${res.status}`;
@@ -44,7 +50,12 @@ async function apiRequest(method, pathname, payload = undefined) {
   return body.result;
 }
 
-const api = (pathname) => apiRequest('GET', pathname);
+async function accountRequest(method, pathname, payload = undefined) {
+  const { account } = credentials();
+  return cfRequest(method, `/accounts/${account}${pathname}`, payload);
+}
+
+const api = (pathname) => accountRequest('GET', pathname);
 
 async function settings(worker) {
   try {
@@ -104,7 +115,7 @@ function productionConfig(databaseId) {
 
 async function attachAndVerifyDomain() {
   console.log(`[boardverse-ci] attaching custom domain ${PROD_HOSTNAME} -> ${PROD_SERVICE}`);
-  const attached = await apiRequest('PUT', '/workers/domains', {
+  const attached = await accountRequest('PUT', '/workers/domains', {
     hostname: PROD_HOSTNAME,
     service: PROD_SERVICE,
     zone_name: PROD_ZONE,
@@ -115,10 +126,38 @@ async function attachAndVerifyDomain() {
   const domains = await api(`/workers/domains?hostname=${encodeURIComponent(PROD_HOSTNAME)}`);
   const rows = Array.isArray(domains) ? domains : [];
   const live = rows.find((item) => item?.hostname === PROD_HOSTNAME);
-  if (!live || live.service !== PROD_SERVICE) {
-    throw new Error(`Custom-domain read-back failed for ${PROD_HOSTNAME}; service=${live?.service || 'missing'}`);
+  if (!live || live.service !== PROD_SERVICE || !live.zone_id) {
+    throw new Error(`Custom-domain read-back failed for ${PROD_HOSTNAME}; service=${live?.service || 'missing'} zone=${live?.zone_id || 'missing'}`);
   }
   console.log(`[boardverse-ci] custom domain verified: ${PROD_HOSTNAME} -> ${PROD_SERVICE}`);
+  return live;
+}
+
+async function reconcileCatchAllRoute(zoneId) {
+  const routePath = `/zones/${zoneId}/workers/routes`;
+  const routes = await cfRequest('GET', routePath);
+  const rows = Array.isArray(routes) ? routes : [];
+  let route = rows.find((item) => String(item?.pattern || '').toLowerCase() === PROD_ROUTE.toLowerCase());
+  if (route) {
+    if (route.script !== PROD_SERVICE) {
+      console.log(`[boardverse-ci] repointing existing Worker Route ${route.pattern}: ${route.script || '(none)'} -> ${PROD_SERVICE}`);
+      route = await cfRequest('PUT', `${routePath}/${route.id}`, { pattern: route.pattern, script: PROD_SERVICE });
+    } else {
+      console.log(`[boardverse-ci] Worker Route already points to ${PROD_SERVICE}: ${route.pattern}`);
+    }
+  } else {
+    console.log(`[boardverse-ci] creating Worker Route ${PROD_ROUTE} -> ${PROD_SERVICE}`);
+    route = await cfRequest('POST', routePath, { pattern: PROD_ROUTE, script: PROD_SERVICE });
+  }
+  if (!route?.id || route?.script !== PROD_SERVICE || String(route?.pattern || '').toLowerCase() !== PROD_ROUTE.toLowerCase()) {
+    throw new Error(`Worker Route reconciliation returned unexpected result: ${JSON.stringify(route)}`);
+  }
+  const verified = await cfRequest('GET', routePath);
+  const check = (Array.isArray(verified) ? verified : []).find((item) => item?.id === route.id);
+  if (!check || check.script !== PROD_SERVICE || String(check.pattern || '').toLowerCase() !== PROD_ROUTE.toLowerCase()) {
+    throw new Error(`Worker Route read-back failed for ${PROD_ROUTE}`);
+  }
+  console.log(`[boardverse-ci] Worker Route verified: ${PROD_ROUTE} -> ${PROD_SERVICE}`);
 }
 
 (async () => {
@@ -150,7 +189,8 @@ async function attachAndVerifyDomain() {
   console.log(`[boardverse-ci] promoting ${versionTag} to 100% production traffic`);
   const deployStatus = runReal(['versions', 'deploy', '--config', configPath, '--version-tag', versionTag, '-y', '--message', message]);
   if (deployStatus !== 0) process.exit(deployStatus);
-  await attachAndVerifyDomain();
+  const domain = await attachAndVerifyDomain();
+  await reconcileCatchAllRoute(domain.zone_id);
   process.exit(0);
 })().catch((error) => {
   console.error(`[boardverse-ci] ${error.stack || error.message}`);
