@@ -13,7 +13,7 @@ mkdirSync(realDir, { recursive: true });
 const fakeWrangler = path.join(realDir, "wrangler.js");
 writeFileSync(
   fakeWrangler,
-  `#!/usr/bin/env node\nconst fs=require("node:fs");\nfs.writeFileSync(process.env.WRANGLER_TEST_OUTPUT, JSON.stringify({ args: process.argv.slice(2), override: process.env.WRANGLER_CI_OVERRIDE_NAME ?? null, workersCi: process.env.WORKERS_CI ?? null }));\nprocess.exit(Number(process.env.WRANGLER_TEST_EXIT_CODE || 0));\n`,
+  `#!/usr/bin/env node\nconst fs=require("node:fs");\nfs.writeFileSync(process.env.WRANGLER_TEST_OUTPUT, JSON.stringify({ args: process.argv.slice(2), override: process.env.WRANGLER_CI_OVERRIDE_NAME ?? null, matchTag: process.env.WRANGLER_CI_MATCH_TAG ?? null, workersCi: process.env.WORKERS_CI ?? null }));\nprocess.exit(Number(process.env.WRANGLER_TEST_EXIT_CODE || 0));\n`,
   "utf8",
 );
 chmodSync(fakeWrangler, 0o755);
@@ -35,31 +35,38 @@ try {
   let result = run(["deploy", "--dry-run"], {
     WORKERS_CI: "1",
     WRANGLER_CI_OVERRIDE_NAME: "games",
+    WRANGLER_CI_MATCH_TAG: "games-worker-tag",
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
   let observed = JSON.parse(readFileSync(output, "utf8"));
   assert.deepEqual(observed.args, ["deploy", "--dry-run"]);
-  assert.equal(observed.override, null, "CI deploy must remove connected Worker override");
+  assert.equal(observed.override, null, "CI deploy must remove connected Worker name override");
+  assert.equal(observed.matchTag, null, "CI deploy must remove connected Worker match tag");
 
   result = run(["versions", "upload"], {
     WORKERS_CI: "1",
     WRANGLER_CI_OVERRIDE_NAME: "games",
+    WRANGLER_CI_MATCH_TAG: "games-worker-tag",
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
   observed = JSON.parse(readFileSync(output, "utf8"));
   assert.equal(observed.override, "games", "non-deploy Wrangler commands must preserve override");
+  assert.equal(observed.matchTag, "games-worker-tag", "non-deploy Wrangler commands must preserve match tag");
 
   result = run(["deploy"], {
     WORKERS_CI: "",
     WRANGLER_CI_OVERRIDE_NAME: "games",
+    WRANGLER_CI_MATCH_TAG: "games-worker-tag",
   });
   assert.equal(result.status, 0, result.stderr || result.stdout);
   observed = JSON.parse(readFileSync(output, "utf8"));
   assert.equal(observed.override, "games", "non-CI deploy must preserve caller environment");
+  assert.equal(observed.matchTag, "games-worker-tag", "non-CI deploy must preserve caller match tag");
 
   result = run(["deploy"], {
     WORKERS_CI: "1",
     WRANGLER_CI_OVERRIDE_NAME: "games",
+    WRANGLER_CI_MATCH_TAG: "games-worker-tag",
     WRANGLER_TEST_EXIT_CODE: "7",
   });
   assert.equal(result.status, 7, "wrapper must propagate Wrangler exit status");
