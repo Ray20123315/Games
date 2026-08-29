@@ -42,6 +42,6 @@ test("only owner feature state exposes member ids and UI sends revision", () => 
   assert.match(source, /type:'host_kick',memberId:m\.id,revision:feature\.revision/);
 });
 
-test("deployment entry points at v012", () => {
-  assert.match(wrangler, /"main": "src\/index-v012\.js"/);
+test("deployment entry points at v013 compatibility layer", () => {
+  assert.match(wrangler, /"main": "src\/index-v013\.js"/);
 });
