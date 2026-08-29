@@ -22,9 +22,19 @@ jobs:
           git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git fetch origin main
           git merge --no-commit --no-ff origin/main || true
+          # Keep v0.1.2 package metadata, but include the newest main regression test.
+          git checkout --ours -- BoardVerse/package.json
           python3 - <<'PY'
           from pathlib import Path
-          import re
+          import json,re
+          pkg=Path('BoardVerse/package.json')
+          data=json.loads(pkg.read_text())
+          test=data['scripts']['test']
+          if 'test/admin-context-bulk.test.mjs' not in test:
+              test=test.replace('node test/admin-workbench.test.mjs', 'node test/admin-context-bulk.test.mjs && node test/admin-workbench.test.mjs')
+          data['scripts']['test']=test
+          pkg.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n')
+
           p=Path('BoardVerse/tools/reconcile-v012-main.mjs')
           s=p.read_text()
           pat=r"  s = one\(s, \"if\(key==='rooms'\).*?'users configure path'\);"
@@ -33,10 +43,35 @@ jobs:
           if n!=1: raise SystemExit(f'configure anchor patch hits={n}')
           p.write_text(s2)
           PY
+          git add BoardVerse/package.json
           node BoardVerse/tools/reconcile-v012-main.mjs
           python3 - <<'PY'
           from pathlib import Path
           import re
+
+          # Preserve latest-main context bulk router/UI on top of v0.1.2's pause + signed-in header wrapper.
+          p=Path('BoardVerse/src/index-v011.js')
+          s=p.read_text()
+          s=s.replace('import { withDatabaseEnv } from "./core/db.js";','import { requireDb, withDatabaseEnv } from "./core/db.js";',1)
+          s=s.replace('import { adminPlayerEntitlement } from "./admin/auth.js";','import { adminPlayerEntitlement, requireAdmin } from "./admin/auth.js";',1)
+          s=s.replace('import { errorJson, json } from "./core/http.js";','import { errorJson, json, toErrorResponse } from "./core/http.js";',1)
+          level='import { injectAdminLevelPanel } from "./admin/level-ui.js";'
+          if level not in s: raise SystemExit('admin level import missing after reconciliation')
+          s=s.replace(level,level+'\nimport { ADMIN_CONTEXT_BULK_SCRIPT } from "./admin/context-bulk-ui.js";\nimport { contextAdminApi, isContextAdminApi } from "./admin/context-actions.js";',1)
+          s=s.replace('function injectSiteScripts(source) {','function injectSiteScripts(source, pathname) {',1)
+          marker='  if (!source.includes(\'id="boardverse-feature-policy"\')) scripts += FEATURE_POLICY_SCRIPT;'
+          if marker not in s: raise SystemExit('feature policy script marker missing')
+          s=s.replace(marker,marker+'\n  if (pathname.startsWith("/admin/") && !source.includes(\'id="boardverse-admin-context-bulk"\')) scripts += ADMIN_CONTEXT_BULK_SCRIPT;',1)
+          envline='    const effectiveEnv = withDatabaseEnv(env);'
+          handler='''    if (isContextAdminApi(requestUrl.pathname)) {\n      try {\n        const adm = await requireAdmin(effectiveEnv, request);\n        const data = await contextAdminApi({ db: requireDb(effectiveEnv), env: effectiveEnv, request, path: requestUrl.pathname, actor: adm.user });\n        return json({ ok: true, data });\n      } catch (error) {\n        return toErrorResponse(error);\n      }\n    }'''
+          if handler not in s:
+              s=s.replace(envline,envline+'\n'+handler,1)
+          old='    const localized = injectSiteScripts(injectPublicNav(withAdminLevel, requestUrl.pathname, navAccount));'
+          new='    const localized = injectSiteScripts(injectPublicNav(withAdminLevel, requestUrl.pathname, navAccount), requestUrl.pathname);'
+          if old not in s: raise SystemExit('localized context injection anchor missing')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+
           p=Path('BoardVerse/test/i18n.test.mjs')
           s=p.read_text()
           anchor='const adminPages = await readFile(new URL("../src/admin/pages.js", import.meta.url), "utf8").catch(() => "");'
@@ -57,7 +92,7 @@ jobs:
           s=s.replace('assert.match(adminApi, /applyDiscipline\\(db, user\\.id, action/);','assert.match(adminApi, /applyDiscipline\\(db,\\s*user\\.id,\\s*action/);')
           p.write_text(s)
           PY
-          git add BoardVerse/test/i18n.test.mjs BoardVerse/test/feature-policy.test.mjs
+          git add BoardVerse/src/index-v011.js BoardVerse/test/i18n.test.mjs BoardVerse/test/feature-policy.test.mjs
           test -z "$(git diff --name-only --diff-filter=U)"
       - name: Install dependencies
         working-directory: BoardVerse
