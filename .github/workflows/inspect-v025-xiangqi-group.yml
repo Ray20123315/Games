@@ -1,9 +1,9 @@
-name: Inspect BoardVerse v0.0.25 selector
+name: Verify BoardVerse v0.0.25 selector
 on:
   push:
     branches: [fix/group-xiangqi-variants-v0.0.25]
 jobs:
-  inspect:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,17 +15,22 @@ jobs:
         run: |
           node build-worker.mjs
           for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024; do node post-build-v${v}.mjs; done
+      - name: Simulate v0.0.25
+        working-directory: BoardVerse
+        run: |
+          node sim-v025.mjs
           node --check worker.js
-      - name: Print selector function
+      - name: Verify selector grouping
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
           const s=await readFile('worker.js','utf8');
-          const a=s.indexOf('function renderGameCatalog()');
-          if(a<0) throw new Error('renderGameCatalog missing');
-          const b=s.indexOf('function ',a+20);
-          console.log('---SELECTOR---');
-          console.log(s.slice(a,b>0?b:a+4000));
-          console.log('---END---');
+          for(const m of ['const APP_VERSION = "0.0.25";','Xiangqi & variants','象棋与变种','象棋與變種',"id==='xiangqi'||id==='banqi'||id==='xiangqi_random'"]) if(!s.includes(m)) throw new Error('missing '+m);
+          const a=s.indexOf('function renderGameCatalog()'), b=s.indexOf('function ',a+20);
+          const fn=s.slice(a,b);
+          if((fn.match(/xiangqiGroup/g)||[]).length<4) throw new Error('Xiangqi group not wired');
+          console.log('V025_BYTES='+Buffer.byteLength(s));
+          console.log('V025_SHA256='+createHash('sha256').update(s).digest('hex'));
           NODE
