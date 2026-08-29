@@ -17,19 +17,11 @@ jobs:
           for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025 026 027 028 029; do node post-build-v${v}.mjs; done
           node --check worker.js
           node --input-type=module <<'NODE'
-          import {readFile} from 'node:fs/promises';
+          import {readFile,writeFile} from 'node:fs/promises';
           const s=await readFile('worker.js','utf8');
-          const needles=['.stone.white','.stone.black','page-theme-black','page-theme-white','stone.className','className=\'stone','className="stone'];
-          for(const n of needles){
-            console.log('\n=== '+n+' ===');
-            let pos=0,count=0;
-            while((pos=s.indexOf(n,pos))>=0&&count<20){
-              console.log(s.slice(Math.max(0,pos-260),Math.min(s.length,pos+520)).replace(/\n/g,' '));
-              pos+=n.length;count++;
-            }
-            console.log('COUNT_SHOWN='+count);
-          }
-          const cssRules=[...s.matchAll(/([^{}]{0,180}\.(?:stone|white|black)[^{}]{0,180})\{([^{}]{0,600})\}/g)];
-          console.log('\n=== PIECE-RELATED CSS RULES ===');
-          for(const m of cssRules.slice(0,80)) console.log((m[1]+'{'+m[2]+'}').replace(/\n/g,' '));
+          const style=s.match(/<style>([\s\S]*?)<\/style>/)?.[1];
+          if(!style) throw new Error('style block not found');
+          const html=`<!doctype html><meta charset="utf-8"><style>${style}</style><body><div id="stone" class="stone white"></div><span id="chess" class="chess-piece white">♔</span><span id="qiguo" class="qiguo-piece" style="background:#f2eee3;color:#17130b">秦</span><pre id="out"></pre><script>function snap(cls){document.body.className=cls;let a=getComputedStyle(stone),b=getComputedStyle(chess),c=getComputedStyle(qiguo);return{theme:cls,stoneBg:a.backgroundColor,stoneImage:a.backgroundImage,chessColor:b.color,qiguoBg:c.backgroundColor,qiguoColor:c.color}}out.textContent=JSON.stringify([snap('page-theme-white'),snap('page-theme-black')]);</script></body>`;
+          await writeFile('piece-theme-test.html',html);
           NODE
+          google-chrome --headless --no-sandbox --disable-gpu --dump-dom file://$PWD/piece-theme-test.html | grep -o '\[{&quot;theme&quot;.*\]' | sed 's/&quot;/"/g'
