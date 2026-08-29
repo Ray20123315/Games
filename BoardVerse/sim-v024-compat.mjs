@@ -77,4 +77,8 @@ const randomAssign='      assignOpeningSides(room, first.id, openingFirstSide(ro
 if(!s.includes(randomAssign)) throw new Error('random opening start marker missing');
 s=s.replace(randomAssign,'      assignOpeningSides(room, first.id, openingFirstSide(room.gameId));\\n      room.startedAt=Date.now();\\n      this.startReplay();');
 
+const staleRequired="  'startedAt: Number(this.room.startedAt)',";
+if(!s.includes(staleRequired)) throw new Error('stale startedAt assertion missing');
+s=s.replace(staleRequired,"  'startedAt:Number(room.startedAt)',");
+
 await writeFile(file, s, "utf8");
