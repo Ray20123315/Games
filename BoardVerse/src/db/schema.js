@@ -101,5 +101,12 @@ CREATE TABLE IF NOT EXISTS chat_mutes (
  subject_type TEXT NOT NULL, subject_id TEXT NOT NULL, channel TEXT NOT NULL, muted_until INTEGER, reason TEXT, created_at INTEGER NOT NULL,
  PRIMARY KEY(subject_type,subject_id,channel)
 );
+CREATE TABLE IF NOT EXISTS chat_archive (
+ id TEXT PRIMARY KEY, channel TEXT NOT NULL, room_id TEXT, sender_kind TEXT NOT NULL, sender_id TEXT,
+ sender_name TEXT NOT NULL, message_text TEXT NOT NULL, created_at INTEGER NOT NULL, delete_after INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_chat_archive_created ON chat_archive(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_archive_room ON chat_archive(room_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_chat_archive_delete ON chat_archive(delete_after);
 `;
 export default BOARDVERSE_SCHEMA_SQL;
