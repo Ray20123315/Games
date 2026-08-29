@@ -1,29 +1,63 @@
-name: Inspect v0.1.2 latest-main merge
+name: Reconcile v0.1.2 latest main
 on:
   push:
     branches: [feat/admin-workbench-v0.1.2]
+permissions:
+  contents: write
 jobs:
-  inspect:
+  reconcile:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Merge dry-run
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Merge latest main
         run: |
-          git config user.name ci-inspect
-          git config user.email ci-inspect@example.invalid
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git fetch origin main
-          set +e
-          git merge --no-commit --no-ff origin/main
-          code=$?
-          echo "MERGE_EXIT=$code"
-          echo "=== STATUS ==="
-          git status --short
-          echo "=== CONFLICT FILES ==="
-          git diff --name-only --diff-filter=U
-          for f in $(git diff --name-only --diff-filter=U); do
-            echo "===== $f ====="
-            grep -n -B 6 -A 12 -E '^(<<<<<<<|=======|>>>>>>>)' "$f" || true
-          done
-          exit 0
+          git merge --no-commit --no-ff origin/main || true
+          node BoardVerse/tools/reconcile-v012-main.mjs
+          test -z "$(git diff --name-only --diff-filter=U)"
+      - name: Install dependencies
+        working-directory: BoardVerse
+        run: npm install --ignore-scripts
+      - name: Full regression suite
+        working-directory: BoardVerse
+        run: npm test
+      - name: Browser and deploy verification
+        working-directory: BoardVerse
+        run: |
+          npm install --no-save --ignore-scripts puppeteer-core@24
+          CHROME="$(command -v google-chrome || command -v chromium || command -v chromium-browser || true)"
+          test -n "$CHROME"
+          npx wrangler dev --local --port 8787 >/tmp/wrangler.log 2>&1 &
+          wp=$!
+          trap 'kill $wp 2>/dev/null || true' EXIT
+          for i in $(seq 1 45); do curl -fsS http://127.0.0.1:8787/ >/dev/null 2>&1 && break; sleep 1; done
+          curl -fsS http://127.0.0.1:8787/ >/dev/null
+          CHROME="$CHROME" node --input-type=module <<'NODE'
+          import puppeteer from 'puppeteer-core';
+          const browser=await puppeteer.launch({executablePath:process.env.CHROME,headless:true,args:['--no-sandbox','--disable-dev-shm-usage'],protocolTimeout:20000});
+          try{
+            const page=await browser.newPage();
+            const errors=[];page.on('pageerror',e=>errors.push(String(e?.stack||e)));
+            await page.goto('http://127.0.0.1:8787/',{waitUntil:'domcontentloaded',timeout:15000});
+            await new Promise(r=>setTimeout(r,1200));
+            const state=await Promise.race([page.evaluate(()=>({ready:document.readyState,form:!!document.getElementById('createForm'),cards:document.querySelectorAll('.game-card').length})),new Promise((_,rej)=>setTimeout(()=>rej(new Error('homepage evaluation watchdog')),5000))]);
+            console.log('FRESH_HOME',state,errors);
+            if(!state.form||state.cards<1)throw new Error('homepage content missing');
+            if(errors.some(x=>/read only property 'CONNECTING'|syncMultiplayerGameOptions|MutationObserver/i.test(x)))throw new Error(errors.join('\n'));
+          } finally { await browser.close(); }
+          NODE
+          npx wrangler deploy --dry-run --outdir dist --config wrangler.jsonc
+      - name: Commit reconciled branch
+        run: |
+          git add BoardVerse .github/workflows/inspect-v012-main-merge.yml
+          git commit -m 'merge: reconcile BoardVerse v0.1.2 with latest main'
+          git push origin HEAD:feat/admin-workbench-v0.1.2
