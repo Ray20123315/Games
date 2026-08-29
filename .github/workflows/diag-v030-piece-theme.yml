@@ -1,0 +1,35 @@
+name: Diagnose v0.0.30 piece theme
+on:
+  push:
+    branches: [fix/piece-theme-v0.0.30]
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build current worker and inspect piece CSS
+        working-directory: BoardVerse
+        run: |
+          node build-worker.mjs
+          for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025 026 027 028 029; do node post-build-v${v}.mjs; done
+          node --check worker.js
+          node --input-type=module <<'NODE'
+          import {readFile} from 'node:fs/promises';
+          const s=await readFile('worker.js','utf8');
+          const needles=['.stone.white','.stone.black','page-theme-black','page-theme-white','stone.className','className=\'stone','className="stone'];
+          for(const n of needles){
+            console.log('\n=== '+n+' ===');
+            let pos=0,count=0;
+            while((pos=s.indexOf(n,pos))>=0&&count<20){
+              console.log(s.slice(Math.max(0,pos-260),Math.min(s.length,pos+520)).replace(/\n/g,' '));
+              pos+=n.length;count++;
+            }
+            console.log('COUNT_SHOWN='+count);
+          }
+          const cssRules=[...s.matchAll(/([^{}]{0,180}\.(?:stone|white|black)[^{}]{0,180})\{([^{}]{0,600})\}/g)];
+          console.log('\n=== PIECE-RELATED CSS RULES ===');
+          for(const m of cssRules.slice(0,80)) console.log((m[1]+'{'+m[2]+'}').replace(/\n/g,' '));
+          NODE
