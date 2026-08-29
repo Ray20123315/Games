@@ -208,7 +208,13 @@ export class GameRoomV012 extends GameRoom {}
 
 export default {
   async fetch(request, env, ctx) {
-    const response = await appV011.fetch(request, env, ctx);
+    let routedRequest = request;
+    const requestUrl = new URL(request.url);
+    if (request.method === "GET" && requestUrl.pathname === "/admin") {
+      requestUrl.pathname = "/admin/";
+      routedRequest = new Request(requestUrl, request);
+    }
+    const response = await appV011.fetch(routedRequest, env, ctx);
     const type = response.headers.get("content-type") || "";
     if (!type.includes("text/html")) return response;
     const body = injectHostKickScript(await response.text());
