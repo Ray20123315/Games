@@ -38,6 +38,7 @@ jobs:
           cd BoardVerse
           node tools/merge-v012-main2.mjs
           node tools/fix-v012-merge3.mjs
+          node tools/fix-v012-merge4.mjs
           cd ..
           git add BoardVerse
           if git diff --name-only --diff-filter=U | grep .; then
