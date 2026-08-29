@@ -69,6 +69,7 @@ jobs:
           rm -rf BoardVerse
           mkdir -p BoardVerse
           tar -xzf /tmp/boardverse-v029-overlay.tar.gz -C BoardVerse
+          rm -f BoardVerse/build-worker.mjs
           mkdir -p BoardVerse/src/legacy
           cp /tmp/runtime-v029.js BoardVerse/src/legacy/runtime-v029.js
           echo '650d3f3e2931dc6ac214f0bbb3cea093ef6693b66e18ec020650e98ad35f043a  BoardVerse/src/legacy/runtime-v029.js' | sha256sum -c -
