@@ -7,6 +7,7 @@ import { activeAnnouncements } from "./announcements/announcements.js";
 import { normalizeClockConfig } from "./clock/clock-engine.js";
 import { revokeCurrentSession, sessionUser } from "./auth/sessions.js";
 import { activateAdminUser, loginUser, registerUser, requestPasswordReset, resendVerification, resetPassword, verifyEmailToken } from "./auth/users.js";
+import { publicAdminIdentity, publicGuestIdentity, publicIdentityForUser, maxMembershipPolicy } from "./auth/identity.js";
 import { checkIn, canCreateCustomRoom, consumeCustomRoom, deletePreset, getUserMembership, listPresets, noteActivity, savePreset } from "./membership/membership.js";
 import { publicReplayByToken, replayById, cleanupReplayArchive } from "./replay/archive.js";
 import { offlineReplayResponse, replayResponse } from "./replay/replay-page.js";
@@ -81,7 +82,11 @@ async function enterRoomProxy(request, env, roomId, legacyJoin=false) {
   const body=await request.json(); const role=legacyJoin?"player":(body.role==="spectator"?"spectator":"player");
   const target=new Request("https://boardverse.internal/enter",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({playerName:body.playerName,returnPassword:String(body.returnPassword||""),role,sessionToken:String(body.sessionToken||"")})});
   const res=await roomStub(env,roomId).fetch(target), data=await res.json().catch(()=>({message:"進入房間失敗。"}));
-  if(res.ok){ const user=await currentUserMaybe(env,request); if(user){ try { await roomStub(env,roomId).fetch(new Request("https://boardverse.internal/feature/attach-user",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:data.token,userId:user.id})})); } catch {} } }
+  if(res.ok){
+    const user=await currentUserMaybe(env,request), adminPlayer=user?null:await adminPlayerEntitlement(env,request);
+    const userId=user?.id||(adminPlayer?`admin:${adminPlayer.user}`:null);
+    if(userId){ try { await roomStub(env,roomId).fetch(new Request("https://boardverse.internal/feature/attach-user",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({token:data.token,userId})})); } catch {} }
+  }
   return json(data,res.status);
 }
 
@@ -94,12 +99,19 @@ async function enhancedLegacy(request, env) {
 }
 
 function jsonWithCookie(data,status,cookieValue){return json(data,status,cookieValue?{"set-cookie":cookieValue}:{});}
+function membershipPayload(m){return {gp:m.gp,level:m.level,name:m.policy.name,reputation:m.reputation,presetSlots:m.policy.presetSlots,maxed:!!m.maxed};}
 
 async function route(request, env) {
   const url=new URL(request.url), path=url.pathname, method=request.method.toUpperCase(); let m;
   if(path==="/health"&&method==="GET") return json({ok:true,app:"BoardVerse",version:APP_VERSION,durableObjectBinding:!!env.ROOMS,globalChatBinding:!!env.GLOBAL_CHAT,databaseBinding:!!env.BOARDVERSE_DB});
   if(path==="/api/announcements"&&method==="GET") return json({ok:true,items:env.BOARDVERSE_DB?await activeAnnouncements(env.BOARDVERSE_DB):[]});
-  if(path==="/api/me"&&method==="GET") { const user=await currentUserMaybe(env,request); if(!user)return json({ok:true,user:null}); const membership=await getUserMembership(env.BOARDVERSE_DB,user.id); await noteActivity(env.BOARDVERSE_DB,user.id).catch(()=>{}); return json({ok:true,user:{id:user.id,username:user.username_display,email:user.email_normalized},membership:{gp:membership.gp,level:membership.level,name:membership.policy.name,reputation:membership.reputation,presetSlots:membership.policy.presetSlots}}); }
+  if(path==="/api/me"&&method==="GET") {
+    const user=await currentUserMaybe(env,request);
+    if(user){const membership=await getUserMembership(env.BOARDVERSE_DB,user.id);await noteActivity(env.BOARDVERSE_DB,user.id).catch(()=>{});const identity=publicIdentityForUser(user,membership);return json({ok:true,user:{id:user.id,username:user.username_display,email:user.email_normalized},identity,membership:membershipPayload(membership)});}
+    const adminPlayer=await adminPlayerEntitlement(env,request);
+    if(adminPlayer){const policy=maxMembershipPolicy();return json({ok:true,user:null,identity:publicAdminIdentity(adminPlayer.user),membership:{gp:policy.gp,level:policy.level,name:policy.name,reputation:100,presetSlots:policy.presetSlots,maxed:true}});}
+    return json({ok:true,user:null,identity:publicGuestIdentity(),membership:null});
+  }
 
   if(path==="/register"&&method==="GET") return authPage("register");
   if(path==="/register"&&method==="POST") { const db=requireDb(env), b=await bodyInput(request); await registerUser(db,env,request,b,baseUrl(request)); return authPage("login","註冊完成，請查看 Email 並先完成驗證。"); }
@@ -116,7 +128,7 @@ async function route(request, env) {
   if(path==="/reset"&&method==="POST") { const db=requireDb(env),b=await bodyInput(request); await resetPassword(db,b.token,b.password); return authPage("login","密碼已更新；舊 Session 已撤銷，請重新登入。"); }
   if(path==="/activate"&&method==="GET") return activatePage(url.searchParams.get("token")||"");
   if(path==="/activate"&&method==="POST") { const db=requireDb(env),b=await bodyInput(request); await activateAdminUser(db,b.token,b.password); return authPage("login","帳號已啟用，請登入。"); }
-  if(path==="/account"&&method==="GET") { const db=requireDb(env),user=await sessionUser(db,request); if(!user)return redirect("/login"); const m=await getUserMembership(db,user.id), presets=await listPresets(db,user.id); return accountPage(user,{gp:m.gp,level:m.level,name:m.policy.name,reputation:m.reputation,presetSlots:m.policy.presetSlots},presets); }
+  if(path==="/account"&&method==="GET") { const db=requireDb(env),user=await sessionUser(db,request); if(!user)return redirect("/login"); const m=await getUserMembership(db,user.id), presets=await listPresets(db,user.id); return accountPage(user,{...membershipPayload(m),isOwner:!!m.isOwner},presets); }
   if(path==="/api/checkin"&&method==="POST") { const db=requireDb(env),user=await sessionUser(db,request); if(!user)throw new HttpError(401,"login_required","請先登入。"); const result=await checkIn(db,user.id); const ct=request.headers.get("content-type")||""; return ct.includes("application/json")?json({ok:true,...result}):redirect("/account"); }
   if(path==="/api/presets"&&method==="GET") { const db=requireDb(env),user=await sessionUser(db,request); if(!user)throw new HttpError(401,"login_required","請先登入。"); return json({ok:true,items:await listPresets(db,user.id)}); }
   if(path==="/api/presets"&&method==="POST") { const db=requireDb(env),user=await sessionUser(db,request); if(!user)throw new HttpError(401,"login_required","請先登入。"); return json({ok:true,preset:await savePreset(db,user,await request.json())}); }
@@ -134,9 +146,12 @@ async function route(request, env) {
   if(path==="/api/global-chat/identity"&&method==="POST") {
     if(!env.GLOBAL_CHAT)throw new HttpError(503,"global_chat_unavailable","GLOBAL_CHAT Durable Object 尚未綁定。");
     if(!env.ADMIN_SESSION_SECRET)throw new HttpError(503,"global_chat_unconfigured","ADMIN_SESSION_SECRET 尚未設定。");
-    const user=await currentUserMaybe(env,request); let guest=parseCookies(request)[GUEST_COOKIE], set=null; if(!user&&!guest){guest=randomToken(18);set=cookie(GUEST_COOKIE,guest,{maxAge:30*24*3600,httpOnly:true,sameSite:"Lax"});}
-    const identity=await signPayload(env.ADMIN_SESSION_SECRET,{kind:user?"user":"guest",id:user?.id||guest,name:user?.username_display||`Guest-${String(guest).slice(0,6)}`,iat:Date.now(),exp:Date.now()+2*60*60_000});
-    return jsonWithCookie({ok:true,identity},200,set);
+    const user=await currentUserMaybe(env,request), adminPlayer=user?null:await adminPlayerEntitlement(env,request); let guest=parseCookies(request)[GUEST_COOKIE], set=null, identity;
+    if(user){const membership=await getUserMembership(env.BOARDVERSE_DB,user.id);const pub=publicIdentityForUser(user,membership);identity={kind:"user",id:user.id,name:user.username_display,role:pub.role,badge:pub.badge,level:pub.level};}
+    else if(adminPlayer){const pub=publicAdminIdentity(adminPlayer.user);identity={kind:"admin",id:`admin:${adminPlayer.user}`,name:pub.name,role:pub.role,badge:pub.badge,level:null};}
+    else {if(!guest){guest=randomToken(18);set=cookie(GUEST_COOKIE,guest,{maxAge:30*24*3600,httpOnly:true,sameSite:"Lax"});}const pub=publicGuestIdentity();identity={kind:"guest",id:guest,name:`Guest-${String(guest).slice(0,6)}`,role:pub.role,badge:pub.badge,level:null};}
+    identity.iat=Date.now();identity.exp=Date.now()+2*60*60_000;
+    return jsonWithCookie({ok:true,identity:await signPayload(env.ADMIN_SESSION_SECRET,identity)},200,set);
   }
   if(path==="/ws/global"&&method==="GET") { if(!env.GLOBAL_CHAT)throw new HttpError(503,"global_chat_unavailable","GLOBAL_CHAT 尚未綁定。"); const target=new URL("https://boardverse.internal/ws"); target.searchParams.set("identity",url.searchParams.get("identity")||""); return env.GLOBAL_CHAT.getByName("global").fetch(new Request(target,request)); }
 
