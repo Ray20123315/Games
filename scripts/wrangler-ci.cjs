@@ -18,7 +18,6 @@ function runReal(args) {
     shell: false,
   });
   if (result.error) throw result.error;
-  process.exitCode = result.status == null ? 1 : result.status;
   return result.status == null ? 1 : result.status;
 }
 
@@ -48,6 +47,20 @@ async function settings(worker) {
 
 function d1Binding(settingsValue) {
   return settingsValue?.bindings?.find((b) => b?.type === 'd1' && b?.name === 'BOARDVERSE_DB') || null;
+}
+
+async function d1ByName(name) {
+  try {
+    const result = await api(`/d1/database?name=${encodeURIComponent(name)}&per_page=20`);
+    const rows = Array.isArray(result) ? result : [];
+    const db = rows.find((row) => row?.name === name) || null;
+    if (!db) return null;
+    const id = db.uuid || db.id || db.database_id || null;
+    return id ? { database_id: id } : null;
+  } catch (error) {
+    console.log(`[boardverse-ci] direct D1 discovery unavailable: ${error.message}`);
+    return null;
+  }
 }
 
 function productionConfig(databaseId) {
@@ -87,33 +100,32 @@ function productionConfig(databaseId) {
 
   let gamesSettings = null;
   let legacySettings = null;
+  let db = null;
   if (isWorkersBuild) {
     gamesSettings = await settings('games');
-    const gamesDb = d1Binding(gamesSettings);
-    console.log(`[boardverse-ci] games BOARDVERSE_DB binding: ${gamesDb ? 'present' : 'absent'}`);
-    if (!gamesDb) {
+    db = d1Binding(gamesSettings);
+    console.log(`[boardverse-ci] games BOARDVERSE_DB binding: ${db ? 'present' : 'absent'}`);
+    if (!db) {
       legacySettings = await settings('crimson-haze-0a4d');
-      console.log(`[boardverse-ci] legacy BOARDVERSE_DB binding: ${d1Binding(legacySettings) ? 'present' : 'absent'}`);
+      db = d1Binding(legacySettings);
+      console.log(`[boardverse-ci] legacy BOARDVERSE_DB binding: ${db ? 'present' : 'absent'}`);
     }
-    if (!gamesDb && !d1Binding(legacySettings)) {
-      throw new Error('BOARDVERSE_DB binding is not discoverable on games or crimson-haze-0a4d; refusing to publish a build with broken registration/admin/report persistence.');
+    if (!db) {
+      db = await d1ByName('boardverse');
+      console.log(`[boardverse-ci] account D1 named boardverse: ${db ? 'present' : 'unavailable'}`);
+    }
+    if (!db?.database_id) {
+      throw new Error('Could not discover the existing boardverse D1 database; refusing to publish a build with broken registration/admin/report persistence.');
     }
   }
 
   if (!isProduction) {
-    const status = runReal(['versions', 'upload', '--config', 'wrangler.preview.jsonc']);
-    process.exit(status);
-  }
-
-  const db = d1Binding(gamesSettings) || d1Binding(legacySettings || await settings('crimson-haze-0a4d'));
-  if (!db?.database_id) {
-    throw new Error('BOARDVERSE_DB database_id was not available after binding discovery.');
+    process.exit(runReal(['versions', 'upload', '--config', 'wrangler.preview.jsonc']));
   }
 
   const configPath = productionConfig(db.database_id);
-  console.log('[boardverse-ci] production binding discovery complete; deploying BoardVerse to games.');
-  const status = runReal(['deploy', '--config', configPath]);
-  process.exit(status);
+  console.log('[boardverse-ci] production D1 discovery complete; deploying BoardVerse to games.');
+  process.exit(runReal(['deploy', '--config', configPath]));
 })().catch((error) => {
   console.error(`[boardverse-ci] ${error.stack || error.message}`);
   process.exit(1);
