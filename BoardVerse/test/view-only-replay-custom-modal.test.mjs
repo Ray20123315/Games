@@ -33,7 +33,6 @@ assert.match(source, /location\.assign\(String\(d\.url\)\)/);
 assert.match(source, /window\.BoardVerseModal\.confirm/);
 assert.match(source, /window\.BoardVerseModal\.alert/);
 assert.match(source, /window\.BoardVerseModal\.prompt/);
-assert.match(source, /"main": "src\/index-v014\.js"/);
 assert.match(wrangler, /"main": "src\/index-v014\.js"/);
 
 console.log("view-only-replay-custom-modal.test: PASS");
