@@ -24,19 +24,31 @@ jobs:
           git merge --no-commit --no-ff origin/main || true
           python3 - <<'PY'
           from pathlib import Path
+          import re
           p=Path('BoardVerse/tools/reconcile-v012-main.mjs')
           s=p.read_text()
-          old="  s = one(s, \"if(key==='rooms'){grid.classList.add('rooms');tools.hidden=true;roomToolbar();loadRooms();return}\", \"if(key==='rooms'){grid.classList.remove('rooms','audit');tools.hidden=false;roomToolbar();loadRooms();return}if(key==='users'){grid.classList.remove('rooms','audit');tools.hidden=false;userToolbar();toolsUsers();loadUsers('');return}\", 'users configure path');"
-          # The temporary script was written against an earlier configure() spelling. Replace its whole one() call by label.
-          import re
           pat=r"  s = one\(s, \"if\(key==='rooms'\).*?'users configure path'\);"
           repl="  s = one(s, \"if(key==='users'){toolsUsers();loadUsers('');return}\", \"if(key==='users'){userToolbar();toolsUsers();loadUsers('');return}\", 'users configure path');"
           s2,n=re.subn(pat,repl,s,count=1)
-          if n!=1:
-              raise SystemExit(f'configure anchor patch hits={n}')
+          if n!=1: raise SystemExit(f'configure anchor patch hits={n}')
           p.write_text(s2)
           PY
           node BoardVerse/tools/reconcile-v012-main.mjs
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('BoardVerse/test/i18n.test.mjs')
+          s=p.read_text()
+          anchor='const adminPages = await readFile(new URL("../src/admin/pages.js", import.meta.url), "utf8").catch(() => "");'
+          if anchor not in s: raise SystemExit('adminPages i18n anchor missing')
+          s=s.replace(anchor,anchor+'\nconst adminWorkbench = await readFile(new URL("../src/admin/workbench.js", import.meta.url), "utf8").catch(() => "");',1)
+          pat=r"if \(adminPages\) \{[\s\S]*?\n\}"
+          repl='''if (adminPages) {\n  assert.match(adminPages, /ADMIN_WORKBENCH_STYLE/);\n  assert.match(adminPages, /ADMIN_WORKBENCH_SCRIPT/);\n}\nif (adminWorkbench) {\n  assert.match(adminWorkbench, /帳號/);\n  assert.match(adminWorkbench, /房間/);\n  assert.match(adminWorkbench, /Replay/);\n  assert.match(adminWorkbench, /Audit Log/);\n  assert.match(adminWorkbench, /批量管理/);\n  assert.match(adminWorkbench, /管理/);\n  assert.match(adminWorkbench, /操作/);\n}'''
+          s2,n=re.subn(pat,repl,s,count=1)
+          if n!=1: raise SystemExit(f'admin i18n assertion replacement hits={n}')
+          p.write_text(s2)
+          PY
+          git add BoardVerse/test/i18n.test.mjs
           test -z "$(git diff --name-only --diff-filter=U)"
       - name: Install dependencies
         working-directory: BoardVerse
