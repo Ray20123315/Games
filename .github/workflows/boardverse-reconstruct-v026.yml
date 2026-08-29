@@ -33,6 +33,18 @@ jobs:
           cp worker.js .migration/current-worker-v026.js
           sha256sum worker.js > .migration/current-worker-v026.sha256
           grep -E '^(export |const APP_VERSION|const GAME_CATALOG|const RULE_DEFS|class |function |async function )' worker.js > .migration/current-worker-v026.symbols.txt || true
+      - name: Upload exact runtime artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: boardverse-v026-runtime
+          path: |
+            BoardVerse/.migration/current-worker-v026.js
+            BoardVerse/.migration/current-worker-v026.sha256
+            BoardVerse/post-build-v024.mjs
+            BoardVerse/post-build-v025.mjs
+            BoardVerse/post-build-v026.mjs
+          if-no-files-found: error
+          retention-days: 3
       - name: Commit exact reconstructed worker
         shell: bash
         run: |
