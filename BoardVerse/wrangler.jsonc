@@ -17,6 +17,12 @@
       { "name": "BOARDVERSE_DB_DO", "class_name": "GameRoom" }
     ]
   },
+  "exports": {
+    "GameRoom": {
+      "type": "durable-object",
+      "storage": "sqlite"
+    }
+  },
   "vars": {
     "TURNSTILE_SITE_KEY": "0x4AAAAAAEgJg9Xf_BRP8k0b",
     "TURNSTILE_HOSTNAMES": "xn--gmqt6w03b11v.ray2025.com,多人棋室.ray2025.com"
