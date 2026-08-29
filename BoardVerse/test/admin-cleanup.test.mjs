@@ -21,7 +21,7 @@ assert.match(pages, /ADMIN_WORKBENCH_SCRIPT \+ ADMIN_CLEANUP_SCRIPT/);
 assert.match(ADMIN_CLEANUP_SCRIPT, /恢復預設/);
 assert.match(ADMIN_CLEANUP_SCRIPT, /永久刪除/);
 assert.match(ADMIN_CLEANUP_SCRIPT, /停用公告/);
-assert.match(ADMIN_CLEANUP_SCRIPT, /data-tab=\\"announcements\\"/);
+assert.match(ADMIN_CLEANUP_SCRIPT, /reloadTab\('announcements'\)/);
 assert.match(ADMIN_CLEANUP_SCRIPT, /\/admin\/api\/settings/);
 assert.match(ADMIN_CLEANUP_SCRIPT, /\/admin\/api\/announcement\/delete/);
 new vm.Script(ADMIN_CLEANUP_SCRIPT, { filename: "admin-cleanup-inline.js" });
