@@ -10,25 +10,33 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build and simulate v0.0.30
+      - name: Full deterministic v0.0.30 build
         working-directory: BoardVerse
         run: |
           node build-worker.mjs
-          for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025 026 027 028 029; do node post-build-v${v}.mjs; done
-          node sim-v030.mjs
+          for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025 026 027 028 029 030; do node post-build-v${v}.mjs; done
           node --check worker.js
-      - name: Verify locked piece colors in Chrome
+      - name: Verify exact output and locked piece colors in Chrome
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile,writeFile} from 'node:fs/promises';
+          import {createHash} from 'node:crypto';
           const s=await readFile('worker.js','utf8');
+          const hash=createHash('sha256').update(s).digest('hex');
+          if(Buffer.byteLength(s)!==263394) throw new Error('unexpected bytes '+Buffer.byteLength(s));
+          if(hash!=='4e0c703c47fc8ebd074db3f455d6f79b5cc5f303793fcc7c16b55c44e3dc3435') throw new Error('unexpected SHA '+hash);
           for(const m of ['const APP_VERSION = "0.0.30";','.board{color-scheme:only light}', 'forced-color-adjust:none', 'background-color:#f4f6f8!important', '-webkit-text-fill-color:#faf7ee!important', "setProperty('background',colors[x.country]||'#ddd','important')"]) if(!s.includes(m)) throw new Error('missing '+m);
           const style=s.match(/<style>([\s\S]*?)<\/style>/)?.[1];
           if(!style) throw new Error('style block not found');
           const html=`<!doctype html><meta charset="utf-8"><style>${style}</style><body><div id="board" class="board"><div id="stone" class="stone white"></div><span id="chess" class="chess-piece white">♔</span><span id="qiguo" class="qiguo-piece" style="background:#f2eee3!important;color:#17130b!important">秦</span></div><pre id="out"></pre><script>function snap(cls){document.body.className=cls;let d=getComputedStyle(board),a=getComputedStyle(stone),b=getComputedStyle(chess),c=getComputedStyle(qiguo);return{theme:cls,boardScheme:d.colorScheme,stoneBg:a.backgroundColor,stoneImage:a.backgroundImage,chessColor:b.color,chessFill:b.webkitTextFillColor,qiguoBg:c.backgroundColor,qiguoColor:c.color}}let x=[snap('page-theme-white'),snap('page-theme-black')];out.textContent=JSON.stringify(x);if(JSON.stringify(x[0]).replace('page-theme-white','x')!==JSON.stringify(x[1]).replace('page-theme-black','x'))document.body.dataset.bad='1';</script></body>`;
           await writeFile('piece-theme-test.html',html);
+          console.log('V030_FINAL_BYTES='+Buffer.byteLength(s));
+          console.log('V030_FINAL_SHA256='+hash);
           NODE
           google-chrome --headless --no-sandbox --disable-gpu --dump-dom file://$PWD/piece-theme-test.html > piece-theme-dump.html 2>/dev/null
           grep '<pre id="out">' piece-theme-dump.html
           ! grep -q 'data-bad="1"' piece-theme-dump.html
+      - name: Verify Cloudflare deploy path
+        working-directory: BoardVerse
+        run: npx --yes wrangler@4.127.1 deploy --dry-run
