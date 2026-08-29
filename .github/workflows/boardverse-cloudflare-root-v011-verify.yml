@@ -1,0 +1,40 @@
+name: BoardVerse v0.1.1 Cloudflare root config verification
+
+on:
+  push:
+    branches:
+      - boardverse-cloudflare-root-config-v011
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify root Wrangler config
+        run: |
+          test -f wrangler.jsonc
+          node - <<'NODE'
+          const fs=require('fs');
+          const strip=s=>s.replace(/\/\*[\s\S]*?\*\//g,'').replace(/^\s*\/\/.*$/gm,'');
+          const root=JSON.parse(strip(fs.readFileSync('wrangler.jsonc','utf8')));
+          const app=JSON.parse(strip(fs.readFileSync('BoardVerse/wrangler.jsonc','utf8')));
+          if(root.name!==app.name) throw new Error('name mismatch');
+          if(root.main!=='BoardVerse/'+app.main) throw new Error('main mismatch');
+          for(const k of ['compatibility_date','routes','durable_objects','exports','triggers','observability','vars']) {
+            if(JSON.stringify(root[k])!==JSON.stringify(app[k])) throw new Error(k+' mismatch');
+          }
+          NODE
+      - name: Install BoardVerse dependencies
+        working-directory: BoardVerse
+        run: npm install
+      - name: Full BoardVerse regression suite
+        working-directory: BoardVerse
+        run: npm test
+      - name: Exact Cloudflare command dry-run from repository root
+        run: npx wrangler@4.127.1 versions upload --dry-run
