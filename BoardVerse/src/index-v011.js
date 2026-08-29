@@ -1,26 +1,33 @@
 import app, { GameRoom as AppGameRoom, GlobalChat as AppGlobalChat } from "./index.js";
 import { APP_VERSION } from "./core/config.js";
 import { withDatabaseEnv } from "./core/db.js";
-import { BoardVerseDb } from "./db/BoardVerseDb.js";
+import { BoardVerseDb as AppBoardVerseDb } from "./db/BoardVerseDb.js";
 import { hardenPieceThemeHtml } from "./ui/piece-theme.js";
 
+// Keep the historical class exports alive because Cloudflare refuses to upload
+// any new version while an existing Durable Object namespace still depends on
+// them. The v0.1.1 namespaces below are separate, so no existing objects are
+// deleted or implicitly migrated.
+export class BoardVerseDb extends AppBoardVerseDb {}
 export class BoardVerseDbV011 extends BoardVerseDb {}
 
-export class GameRoomV011 extends AppGameRoom {
+export class GameRoom extends AppGameRoom {
   constructor(ctx, env) {
     const effectiveEnv = withDatabaseEnv(env);
     super(ctx, effectiveEnv);
     this.env = effectiveEnv;
   }
 }
+export class GameRoomV011 extends GameRoom {}
 
-export class GlobalChatV011 extends AppGlobalChat {
+export class GlobalChat extends AppGlobalChat {
   constructor(ctx, env) {
     const effectiveEnv = withDatabaseEnv(env);
     super(ctx, effectiveEnv);
     this.env = effectiveEnv;
   }
 }
+export class GlobalChatV011 extends GlobalChat {}
 
 function injectPublicNav(source, pathname) {
   if (pathname !== "/" || source.includes('id="bvPublicNav"')) return source;
