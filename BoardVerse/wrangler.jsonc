@@ -1,37 +1,27 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "crimson-haze-0a4d",
+  "name": "games",
   "main": "src/index-v011.js",
   "compatibility_date": "2026-08-28",
-  "routes": [
-    {
-      "pattern": "xn--gmqt6w03b11v.ray2025.com",
-      "custom_domain": true
-    }
-  ],
+  "workers_dev": false,
+  "keep_vars": true,
   "durable_objects": {
     "bindings": [
       { "name": "ROOMS", "class_name": "GameRoom" },
-      { "name": "GLOBAL_CHAT", "class_name": "GlobalChat" }
+      { "name": "GLOBAL_CHAT", "class_name": "GlobalChat" },
+      { "name": "BOARDVERSE_DB_DO", "class_name": "BoardVerseDb" }
     ]
   },
-  "exports": {
-    "GameRoom": { "type": "durable-object", "storage": "sqlite" },
-    "GlobalChat": { "type": "durable-object", "storage": "sqlite" }
-  },
-  "triggers": {
-    "crons": ["0 16 * * *"]
-  },
-  "observability": {
-    "enabled": true
-  },
+  "migrations": [
+    {
+      "tag": "boardverse-v011-sqlite-do",
+      "new_sqlite_classes": ["GameRoom", "GlobalChat", "BoardVerseDb"]
+    }
+  ],
+  "triggers": { "crons": ["0 16 * * *"] },
+  "observability": { "enabled": true },
   "vars": {
     "TURNSTILE_SITE_KEY": "0x4AAAAAAEgJg9Xf_BRP8k0b",
     "TURNSTILE_HOSTNAMES": "xn--gmqt6w03b11v.ray2025.com,多人棋室.ray2025.com"
   }
-
-  // BOARDVERSE_DB intentionally is not declared here until the real Cloudflare
-  // D1 resource exists. Cloudflare requires binding + database_name + database_id.
-  // Required production binding: BOARDVERSE_DB -> D1 database "boardverse".
-  // Do not replace this with a fabricated UUID.
 }
