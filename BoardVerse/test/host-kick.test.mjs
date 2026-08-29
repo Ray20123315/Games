@@ -6,7 +6,7 @@ const source = fs.readFileSync(new URL("../src/index-v012.js", import.meta.url),
 const wrangler = fs.readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 
 test("host kick is revisioned and server-authoritative", () => {
-  assert.match(source, /msg\?\.type !== "kick_member"/);
+  assert.match(source, /msg\.type !== "kick_member"/);
   assert.match(source, /requireRevision\(room, msg\.revision\)/);
   assert.match(source, /assertOwner\(room, owner\)/);
   assert.match(source, /if \(target\.id === room\.ownerId\)/);
