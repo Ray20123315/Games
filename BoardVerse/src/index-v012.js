@@ -7,6 +7,7 @@ import { ROOM_CODE_RE } from "./core/config.js";
 import { audit, withDatabaseEnv } from "./core/db.js";
 import { errorJson, json, toErrorResponse } from "./core/http.js";
 import { requireAdmin } from "./admin/auth.js";
+import { archiveChatMessage, cleanupChatArchive, listChatArchive } from "./chat/archive.js";
 
 export { BoardVerseDb, BoardVerseDbV011, GameRoomV011, GlobalChat, GlobalChatV011 } from "./index-v011.js";
 
@@ -14,6 +15,10 @@ const MAX_ROOM_ANNOUNCEMENT = 500;
 
 function memberById(room, id) {
   return room?.members?.find((member) => member.id === id) || null;
+}
+
+function memberByToken(room, token) {
+  return room?.members?.find((member) => member.token === token) || null;
 }
 
 function publicMember(room, member) {
@@ -45,17 +50,33 @@ function cleanAnnouncementText(value) {
   return text;
 }
 
+const ROOM_UI_STYLE = String.raw`<style id="boardverse-room-controls-style">
+@keyframes bvAdminAnnouncementPulse{0%,100%{box-shadow:0 0 0 0 rgba(212,175,55,0);border-color:#8a6a00}50%{box-shadow:0 0 0 5px rgba(212,175,55,.28),0 0 30px rgba(212,175,55,.2);border-color:#f0d36a}}
+#bvRoomAnnouncement.bv-announcement-flash{animation:bvAdminAnnouncementPulse .7s ease-in-out 4}
+#bvRoomAnnouncementOverlay{position:fixed;z-index:30000;inset:0;display:none;place-items:center;padding:20px;background:rgba(0,0,0,.72);backdrop-filter:blur(5px)}
+#bvRoomAnnouncementOverlay.show{display:grid}
+#bvRoomAnnouncementDialog{width:min(520px,94vw);max-height:80vh;overflow:auto;padding:20px;border:1px solid #9d7b1d;border-radius:18px;background:#14120c;color:#f7eab4;box-shadow:0 24px 80px rgba(0,0,0,.62)}
+#bvRoomAnnouncementDialog h3{margin:0 0 10px;color:#f0d36a;font-size:18px}#bvRoomAnnouncementDialog p{margin:0;white-space:pre-wrap;word-break:break-word;line-height:1.65}
+#bvRoomAnnouncementDialog .actions{display:flex;justify-content:flex-end;margin-top:16px}
+#bvRoomAnnouncementChat .chat-bubble{border-color:#8a6a00!important;background:#211b0d!important;color:#f8e7a7!important}
+#bvRoomAnnouncementChat .chat-meta{color:#d4af37!important;font-weight:800}
+</style>`;
+
 const ROOM_UI_SCRIPT = String.raw`<script id="boardverse-room-controls">
 (function(){
 'use strict';
-var feature=null;
+var feature=null,lastAnnouncementAt=0;
 function lang(){try{return localStorage.getItem('boardverseLang')||'zh-Hant'}catch(e){return 'zh-Hant'}}
 function text(h,s,e){return lang()==='en'?e:lang()==='zh-Hans'?s:h}
 function ensureKickPanel(){var players=document.getElementById('players');if(!players)return null;var panel=document.getElementById('bvHostKickPanel');if(panel)return panel;panel=document.createElement('section');panel.id='bvHostKickPanel';panel.className='setup hidden';panel.style.marginTop='12px';players.parentNode.insertBefore(panel,players.nextSibling);return panel}
 function roleText(m){if(m.seated)return text('玩家','玩家','Player');if(m.role==='queued')return text('排隊','排队','Queued');if(m.role==='pending')return text('待審核','待审核','Pending');return text('觀眾','观众','Spectator')}
 function syncKick(next){feature=next||feature;var panel=ensureKickPanel();if(!panel)return;var members=feature&&feature.isOwner&&Array.isArray(feature.kickableMembers)?feature.kickableMembers:[];if(!feature||!feature.isOwner){panel.classList.add('hidden');panel.textContent='';return}panel.classList.remove('hidden');panel.textContent='';var title=document.createElement('strong');title.textContent=text('房主管理','房主管理','Host controls');panel.appendChild(title);var hint=document.createElement('div');hint.className='small muted';hint.style.margin='6px 0 10px';hint.textContent=text('可在遊戲開始前、進行中或結束後踢出成員。進行中踢出在席玩家會將該局以無結果終止。','可在游戏开始前、进行中或结束后踢出成员。进行中踢出在席玩家会将该局以无结果终止。','Members can be kicked before, during, or after a game. Kicking a seated player during play ends that game with no result.');panel.appendChild(hint);if(!members.length){var empty=document.createElement('div');empty.className='small muted';empty.textContent=text('目前沒有可踢出的其他成員。','目前没有可踢出的其他成员。','There are no other members to remove.');panel.appendChild(empty);return}members.forEach(function(m){var row=document.createElement('div');row.className='queue-row';row.style.display='flex';row.style.alignItems='center';row.style.justifyContent='space-between';row.style.gap='10px';var label=document.createElement('span');label.textContent=m.name+' · '+roleText(m)+' · '+(m.connected?text('在線','在线','online'):text('離線','离线','offline'));var button=document.createElement('button');button.type='button';button.className='btn ghost';button.textContent=text('踢出','踢出','Kick');button.addEventListener('click',function(){if(!feature)return;var phase=feature.status==='playing'&&m.seated?'\n\n'+text('此玩家正在對局，本局會以無結果終止。','此玩家正在对局，本局会以无结果终止。','This player is in the active game; the game will end with no result.'):'';var confirmText=text('確定要將「'+m.name+'」踢出房間嗎？','确定要将“'+m.name+'”踢出房间吗？','Kick “'+m.name+'” from the room?')+phase;if(!window.confirm(confirmText))return;var bridge=window.BoardVerseBridge;if(!bridge||typeof bridge.send!=='function')return;button.disabled=true;var sent=bridge.send({type:'host_kick',memberId:m.id,revision:feature.revision});if(!sent){button.disabled=false;window.alert(text('目前無法送出踢人指令。','目前无法送出踢人指令。','Unable to send the kick command right now.'));return}setTimeout(function(){button.disabled=false},1200)});row.appendChild(label);row.appendChild(button);panel.appendChild(row)})}
 function ensureAnnouncement(){var title=document.getElementById('roomTitle');if(!title)return null;var node=document.getElementById('bvRoomAnnouncement');if(node)return node;node=document.createElement('aside');node.id='bvRoomAnnouncement';node.setAttribute('role','status');node.style.cssText='display:none;margin:10px 0 14px;padding:12px 14px;border:1px solid #8a6a00;border-radius:12px;background:#211b0d;color:#f8e7a7;line-height:1.55;white-space:pre-wrap;word-break:break-word';var anchor=title.parentElement||title;anchor.parentNode.insertBefore(node,anchor.nextSibling);return node}
-function syncAnnouncement(next){feature=next||feature;var node=ensureAnnouncement();if(!node)return;var item=feature&&feature.roomAnnouncement;var content=item&&String(item.text||'').trim();if(!content){node.style.display='none';node.textContent='';return}node.style.display='block';node.textContent=text('ADMIN 房內公告：','ADMIN 房内公告：','ADMIN room announcement: ') + content}
+function ensureModal(){var overlay=document.getElementById('bvRoomAnnouncementOverlay');if(overlay)return overlay;overlay=document.createElement('div');overlay.id='bvRoomAnnouncementOverlay';overlay.setAttribute('role','dialog');overlay.setAttribute('aria-modal','true');var dialog=document.createElement('div');dialog.id='bvRoomAnnouncementDialog';var h=document.createElement('h3');h.textContent=text('ADMIN 房內公告','ADMIN 房内公告','ADMIN room announcement');var p=document.createElement('p');p.id='bvRoomAnnouncementModalText';var actions=document.createElement('div');actions.className='actions';var ok=document.createElement('button');ok.type='button';ok.className='btn';ok.textContent=text('知道了','知道了','OK');ok.addEventListener('click',function(){overlay.classList.remove('show')});actions.appendChild(ok);dialog.appendChild(h);dialog.appendChild(p);dialog.appendChild(actions);overlay.appendChild(dialog);overlay.addEventListener('click',function(e){if(e.target===overlay)overlay.classList.remove('show')});document.body.appendChild(overlay);return overlay}
+function showPopup(content){var overlay=ensureModal(),p=document.getElementById('bvRoomAnnouncementModalText');if(p)p.textContent=content;overlay.classList.add('show')}
+function flashBanner(node){node.classList.remove('bv-announcement-flash');void node.offsetWidth;node.classList.add('bv-announcement-flash');setTimeout(function(){node.classList.remove('bv-announcement-flash')},3200)}
+function chatReminder(content,at){var list=document.getElementById('chatList');if(!list)return;var old=document.getElementById('bvRoomAnnouncementChat');if(old)old.remove();var wrap=document.createElement('div');wrap.id='bvRoomAnnouncementChat';wrap.className='chat-msg';var meta=document.createElement('div');meta.className='chat-meta';meta.textContent=text('ADMIN 房內公告','ADMIN 房内公告','ADMIN room announcement')+' · '+new Date(at||Date.now()).toLocaleTimeString(lang()==='en'?'en-US':lang()==='zh-Hans'?'zh-CN':'zh-TW',{hour:'2-digit',minute:'2-digit'});var bubble=document.createElement('div');bubble.className='chat-bubble';bubble.textContent=content;wrap.appendChild(meta);wrap.appendChild(bubble);list.appendChild(wrap);list.scrollTop=list.scrollHeight}
+function syncAnnouncement(next){feature=next||feature;var node=ensureAnnouncement();if(!node)return;var item=feature&&feature.roomAnnouncement;var content=item&&String(item.text||'').trim();if(!content){node.style.display='none';node.textContent='';var old=document.getElementById('bvRoomAnnouncementChat');if(old)old.remove();return}node.style.display='block';node.textContent=text('ADMIN 房內公告：','ADMIN 房内公告：','ADMIN room announcement: ') + content;chatReminder(content,item.updatedAt);var stamp=Number(item.updatedAt||0);if(stamp&&stamp!==lastAnnouncementAt){lastAnnouncementAt=stamp;flashBanner(node);showPopup(content)}}
 function sync(next){feature=next||feature;syncKick(feature);syncAnnouncement(feature)}
 window.addEventListener('boardverse:feature',function(e){sync(e.detail)});
 window.addEventListener('boardverse:language',function(){sync(feature)});
@@ -85,9 +106,16 @@ var observer=new MutationObserver(mount);observer.observe(document.documentEleme
 </script>`;
 
 function injectRoomUi(source) {
-  if (source.includes('id="boardverse-room-controls"')) return source;
-  if (/<\/body>/i.test(source)) return source.replace(/<\/body>/i, `${ROOM_UI_SCRIPT}</body>`);
-  return source + ROOM_UI_SCRIPT;
+  let next = source;
+  if (!next.includes('id="boardverse-room-controls-style"')) {
+    if (/<\/head>/i.test(next)) next = next.replace(/<\/head>/i, `${ROOM_UI_STYLE}</head>`);
+    else next = ROOM_UI_STYLE + next;
+  }
+  if (!next.includes('id="boardverse-room-controls"')) {
+    if (/<\/body>/i.test(next)) next = next.replace(/<\/body>/i, `${ROOM_UI_SCRIPT}</body>`);
+    else next += ROOM_UI_SCRIPT;
+  }
+  return next;
 }
 
 function injectAdminUi(source) {
@@ -140,6 +168,26 @@ export class GameRoom extends GameRoomBase {
       return json({ ok: true, roomId: this.room.id, announcement: bv.roomAnnouncement });
     }
     return super.fetch(request);
+  }
+
+  async handleChat(token, text) {
+    const room = this.room;
+    const member = memberByToken(room, token);
+    const result = await super.handleChat(token, text);
+    if (this.env?.BOARDVERSE_DB && room && member) {
+      const bv = ensureFeatureState(room);
+      const userId = bv.memberUsers?.[member.id] || member.userId || null;
+      await archiveChatMessage(this.env.BOARDVERSE_DB, {
+        channel: "room",
+        roomId: room.id,
+        senderKind: userId ? "user" : "guest",
+        senderId: userId || member.id,
+        senderName: member.name,
+        text,
+        createdAt: Date.now(),
+      }).catch(() => {});
+    }
+    return result;
   }
 
   async webSocketMessage(ws, message) {
@@ -324,11 +372,33 @@ async function adminRoomAnnouncement(request, env) {
   return json({ ok: failed === 0, requested: roomIds.length, succeeded, failed, results });
 }
 
+async function adminChatArchive(request, env) {
+  const effectiveEnv = withDatabaseEnv(env);
+  if (!effectiveEnv?.BOARDVERSE_DB) return errorJson("資料庫尚未設定。", 503, "database_unavailable");
+  await requireAdmin(effectiveEnv, request);
+  const url = new URL(request.url);
+  const channel = url.searchParams.get("channel");
+  const roomId = url.searchParams.get("roomId");
+  if (roomId && !ROOM_CODE_RE.test(String(roomId).toUpperCase())) return errorJson("房號格式錯誤。", 400, "room_invalid");
+  const items = await listChatArchive(effectiveEnv.BOARDVERSE_DB, {
+    channel,
+    roomId: roomId ? String(roomId).toUpperCase() : null,
+    q: url.searchParams.get("q") || "",
+    limit: Number(url.searchParams.get("limit")) || 100,
+    offset: Number(url.searchParams.get("offset")) || 0,
+  });
+  return json({ ok: true, retentionDays: 60, items });
+}
+
 export default {
   async fetch(request, env, ctx) {
     const originalUrl = new URL(request.url);
     if (originalUrl.pathname === "/admin/api/rooms/announcement" && request.method === "POST") {
       try { return await adminRoomAnnouncement(request, env); }
+      catch (error) { return toErrorResponse(error); }
+    }
+    if (originalUrl.pathname === "/admin/api/chat-archive" && request.method === "GET") {
+      try { return await adminChatArchive(request, env); }
       catch (error) { return toErrorResponse(error); }
     }
 
@@ -349,7 +419,9 @@ export default {
     headers.delete("content-length");
     return new Response(body, { status: response.status, statusText: response.statusText, headers });
   },
-  scheduled(event, env, ctx) {
-    return appV011.scheduled(event, env, ctx);
+  async scheduled(event, env, ctx) {
+    await appV011.scheduled(event, env, ctx);
+    const effectiveEnv = withDatabaseEnv(env);
+    if (effectiveEnv?.BOARDVERSE_DB) await cleanupChatArchive(effectiveEnv.BOARDVERSE_DB, Date.now()).catch(() => {});
   },
 };
