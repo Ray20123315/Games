@@ -10,22 +10,24 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build and simulate v0.0.29
+      - name: Full deterministic v0.0.29 build
         working-directory: BoardVerse
         run: |
           node build-worker.mjs
-          for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025 026 027 028; do node post-build-v${v}.mjs; done
-          node sim-v029.mjs
+          for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025 026 027 028 029; do node post-build-v${v}.mjs; done
           node --check worker.js
-      - name: Verify contrast markers
+      - name: Verify exact output and contrast fix
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
           import {createHash} from 'node:crypto';
-          const s=await readFile('worker.js','utf8');
-          for(const m of ['const APP_VERSION = "0.0.29";','background:linear-gradient(135deg,#806a3c 0%,#c3a15f 50%,#e7d7a8 100%);color:#211a0f','body.page-theme-white .game-rule-detail{color:#3f3527','color:var(--text)}.btn.ghost']) if(!s.includes(m)) throw new Error('missing '+m);
-          if(s.includes('background:var(--gold-gradient);color:#1b160d')) throw new Error('stale undefined gold gradient tab style');
-          console.log('V029_FINAL_BYTES='+Buffer.byteLength(s));
-          console.log('V029_FINAL_SHA256='+createHash('sha256').update(s).digest('hex'));
+          const s=await readFile('worker.js','utf8'), hash=createHash('sha256').update(s).digest('hex');
+          if(Buffer.byteLength(s)!==263107) throw new Error('unexpected bytes '+Buffer.byteLength(s));
+          if(hash!=='650d3f3e2931dc6ac214f0bbb3cea093ef6693b66e18ec020650e98ad35f043a') throw new Error('unexpected SHA '+hash);
+          for(const m of ['const APP_VERSION = "0.0.29";','body.page-theme-white .game-rule-detail{color:#3f3527','color:var(--text)}.btn.ghost']) if(!s.includes(m)) throw new Error('missing '+m);
+          if(s.includes('background:var(--gold-gradient);color:#1b160d')) throw new Error('stale invalid selected-tab style');
           NODE
+      - name: Verify Cloudflare deploy path
+        working-directory: BoardVerse
+        run: npx --yes wrangler@4.127.1 deploy --dry-run
