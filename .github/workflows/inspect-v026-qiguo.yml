@@ -16,28 +16,12 @@ jobs:
           node build-worker.mjs
           for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025; do node post-build-v${v}.mjs; done
           node --check worker.js
-      - name: Inspect exact blocks
+      - name: Inspect details
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
           const s=await readFile('worker.js','utf8');
-          function block(marker){
-            const a=s.indexOf(marker); if(a<0){console.log('MISSING '+marker);return}
-            const o=s.indexOf('{',a);let d=0,q='',esc=false,line=false,com=false;
-            for(let i=o;i<s.length;i++){
-              const c=s[i],n=s[i+1];
-              if(line){if(c==='\n')line=false;continue} if(com){if(c==='*'&&n==='/'){com=false;i++}continue}
-              if(q){if(esc){esc=false;continue}if(c==='\\'){esc=true;continue}if(c===q)q='';continue}
-              if(c==='/'&&n==='/'){line=true;i++;continue}if(c==='/'&&n==='*'){com=true;i++;continue}
-              if(c==='"'||c==="'"||c==='`'){q=c;continue}if(c==='{')d++;else if(c==='}'&&--d===0){console.log('\n--- '+marker+' ---\n'+s.slice(a,i+1));return}
-            }
-          }
-          for(const m of [
-            '  async loadRoom() {','  maybeStartMatch() {','  async initRoom(request) {','  async roomInfo() {','  async enterRoom(request) {',
-            '  async reviewJoin(token, requestId, approve) {','  async resign(token) {','  async finishMatch(result) {','  publicResult(result) {','  rotateAfterMatch(result) {',
-            'function resultSummary(','function roomView(','function sanitizeLobbyRecord(','function renderPlayers(','function renderStatus(','function renderLobby','function renderRooms'
-          ]) block(m);
-          const ga=s.indexOf('const GAME_CATALOG ='); console.log('\n--- GAME_CATALOG ---\n'+s.slice(ga,s.indexOf('const RULE_DEFS =',ga)));
-          const ra=s.indexOf('const RULE_DEFS ='); console.log('\n--- RULE_DEFS_HEAD ---\n'+s.slice(ra,Math.min(s.length,ra+9000)));
+          function block(marker){const a=s.indexOf(marker);if(a<0){console.log('MISSING '+marker);return}const o=s.indexOf('{',a);let d=0,q='',esc=false,line=false,com=false;for(let i=o;i<s.length;i++){const c=s[i],n=s[i+1];if(line){if(c==='\n')line=false;continue}if(com){if(c==='*'&&n==='/'){com=false;i++}continue}if(q){if(esc){esc=false;continue}if(c==='\\'){esc=true;continue}if(c===q)q='';continue}if(c==='/'&&n==='/'){line=true;i++;continue}if(c==='/'&&n==='*'){com=true;i++;continue}if(c==='"'||c==="'"||c==='`'){q=c;continue}if(c==='{')d++;else if(c==='}'&&--d===0){console.log('\n--- '+marker+' ---\n'+s.slice(a,i+1));return}}}
+          for(const m of ['function renderOpening(','function bindPoint(','function renderPublicRooms(','function renderLobbyRooms(','  async voteRematch(token) {','  async alarm() {','  async queueSettings(token, msg) {','  startReplay() {'])block(m);
           NODE
