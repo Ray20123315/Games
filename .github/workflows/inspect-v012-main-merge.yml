@@ -1,0 +1,29 @@
+name: Inspect v0.1.2 latest-main merge
+on:
+  push:
+    branches: [feat/admin-workbench-v0.1.2]
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Merge dry-run
+        run: |
+          git config user.name ci-inspect
+          git config user.email ci-inspect@example.invalid
+          git fetch origin main
+          set +e
+          git merge --no-commit --no-ff origin/main
+          code=$?
+          echo "MERGE_EXIT=$code"
+          echo "=== STATUS ==="
+          git status --short
+          echo "=== CONFLICT FILES ==="
+          git diff --name-only --diff-filter=U
+          for f in $(git diff --name-only --diff-filter=U); do
+            echo "===== $f ====="
+            grep -n -B 6 -A 12 -E '^(<<<<<<<|=======|>>>>>>>)' "$f" || true
+          done
+          exit 0
