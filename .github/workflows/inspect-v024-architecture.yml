@@ -2,14 +2,37 @@ name: Verify BoardVerse v0.0.24
 on:
   push:
     branches: [feature/game-variants-opening-allocation-v0.0.24]
+permissions:
+  contents: write
 jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Recreate exact formal patch from verified simulation source
+        working-directory: BoardVerse
+        run: |
+          node sim-v024-compat.mjs
+          node --input-type=module <<'NODE'
+          import {readFile,writeFile} from 'node:fs/promises';
+          let s=await readFile('sim-v024.mjs','utf8');
+          const imp='import { readFile, writeFile } from "node:fs/promises";';
+          if(!s.includes(imp)) throw new Error('formal import marker missing');
+          s=s.replace(imp,imp+'\nimport { createHash } from "node:crypto";',1);
+          const src='let source = await readFile(worker, "utf8");\n';
+          if(!s.includes(src)) throw new Error('formal source marker missing');
+          s=s.replace(src,src+'const sourceHash = createHash("sha256").update(source).digest("hex");\nconst expectedSourceHash = "8f168113e24472377fec462bf61812e0b765a3707f72f7f6b249a6997e4a23e5";\nif (sourceHash !== expectedSourceHash) throw new Error(`v0.0.24 source hash mismatch: ${sourceHash}`);\n',1);
+          const tail='await writeFile(worker, source, "utf8");\nconsole.log(`SIM_V024_BYTES=${Buffer.byteLength(source)}`);\n';
+          if(!s.includes(tail)) throw new Error('formal tail marker missing');
+          s=s.replace(tail,'const outputHash = createHash("sha256").update(source).digest("hex");\nconst expectedOutputHash = "bf661f6d7f09c21742d0d75fd2cda4825d270136ef5a64d70399c69769ee2ed7";\nif (outputHash !== expectedOutputHash) throw new Error(`v0.0.24 output hash mismatch: ${outputHash}`);\nawait writeFile(worker, source, "utf8");\nconsole.log(`Patched BoardVerse v0.0.24 worker.js (${Buffer.byteLength(source)} bytes, SHA-256 ${outputHash})`);\n',1);
+          await writeFile('post-build-v024.mjs',s);
+          NODE
+          node --check post-build-v024.mjs
       - name: Build formal v0.0.24
         working-directory: BoardVerse
         run: |
@@ -54,3 +77,14 @@ jobs:
       - name: Reproduce Cloudflare root deploy command safely
         run: |
           npx --yes wrangler@4.127.1 versions upload --dry-run
+      - name: Commit exact formal patch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add BoardVerse/post-build-v024.mjs
+          if git diff --cached --quiet; then
+            echo "formal patch already exact"
+          else
+            git commit -m "Finalize BoardVerse v0.0.24 patch"
+            git push origin HEAD:feature/game-variants-opening-allocation-v0.0.24
+          fi
