@@ -1,10 +1,12 @@
 # BoardVerse
 
-BoardVerse v0.1.0 是以 Cloudflare Worker、SQLite-backed Durable Objects 與 Hibernation WebSocket 實作的多人棋室。
+BoardVerse v0.1.1 是以 Cloudflare Worker、SQLite-backed Durable Objects 與 Hibernation WebSocket 實作的多人棋室。
 
 ## 原始碼架構
 
-`src/` 現在是唯一權威產品來源，Wrangler 入口固定為 `src/index.js`。舊版 gzip/Base64 source chunks、`build-worker.mjs`、`post-build-v*.mjs` 與 `sim-v*.mjs` deterministic patch chain 不再參與正式建置。
+`src/` 是唯一權威產品來源，Wrangler 正式入口固定為 `src/index-v011.js`。舊版 gzip/Base64 source chunks、`post-build-v*.mjs` 與 `sim-v*.mjs` deterministic patch chain 不再參與正式建置。
+
+`build-worker.mjs` 現在只是一個 **Cloudflare Workers Builds 驗證 gate**：先跑完整 `npm test`，再執行 `wrangler deploy --dry-run`。它不再生成或 patch 正式 Worker 原始碼；驗證成功後，Cloudflare 既有 Deploy command `npx wrangler deploy` 才會真正部署 `src/index-v011.js`。
 
 為避免重構時改壞既有遊戲規則與 UI 行為，v0.0.29 的最終生成結果以可讀 JavaScript 固定在 `src/legacy/runtime-v029.js` 作為 compatibility runtime；新的房間狀態、權限、棋鐘、Replay、帳號、會員、管理與 UI 擴充則拆成一般 ES Modules。
 
@@ -14,7 +16,7 @@ BoardVerse v0.1.0 是以 Cloudflare Worker、SQLite-backed Durable Objects 與 H
 
 保留的既有行為包含圍棋 9×9 / 13×13 / 19×19、五子棋、Renju、象棋、隨機象棋、暗棋、七國象棋、西洋棋、黑白棋、公開／私人房、房主審核、排隊輪替、玩家／觀眾分頻聊天、三語 UI、回場密碼、離線處理、房內回放、公開大廳、搜尋、主題、規則設定、上一手標記，以及 v0.0.24～v0.0.29 新增的開局／陣營配置與 UI 修正。
 
-## v0.1.0 功能
+## v0.1.1 功能
 
 - Server-authoritative `revision + Event History + Snapshot`。
 - 玩家 Ready；一般雙人棋種需兩席均有人且雙方 Ready，七國象棋依動態席位數要求所有座位就緒。
@@ -42,27 +44,37 @@ BoardVerse v0.1.0 是以 Cloudflare Worker、SQLite-backed Durable Objects 與 H
 ```bash
 npm install
 npm test
-npx wrangler deploy --dry-run --outdir dist
+node build-worker.mjs
 ```
 
-最終整合候選已在 Node 22 + Wrangler 4.127.1 上通過 syntax、完整 regression suite、exact v0.0.29 runtime SHA 驗證、source-authority 檢查與 Wrangler dry-run。
+`node build-worker.mjs` 會再做一次完整 regression suite 與 Wrangler production dry-run。候選整合以 Node 22 與 Cloudflare Workers Builds 的 Node 24 環境驗證。
 
 ## Cloudflare 設定
 
-Root directory：`BoardVerse`
+目前 Git-connected Workers Build 使用：
 
-正式部署指令：
+- Root directory：`/BoardVerse`
+- Build command：`node build-worker.mjs`
+- Deploy command：`npx wrangler deploy`
+- Production branch：`main`
 
-```bash
-npx wrangler deploy
-```
+非 production branch 由 Cloudflare Workers Builds 使用 preview version upload，不應切換正式流量。
 
-Durable Objects：
+### 正式網域與 Routing
 
-- `ROOMS → GameRoom`（SQLite）
-- `GLOBAL_CHAT → GlobalChat`（SQLite）
+`wrangler.jsonc` 直接宣告正式 hostname，不再依賴 repository root 的 deploy adapter：
 
-Cron：`0 16 * * *` UTC（Asia/Taipei 每日 00:00）
+- Worker Route：`xn--gmqt6w03b11v.ray2025.com/*`，zone `ray2025.com`
+- Custom Domain：`xn--gmqt6w03b11v.ray2025.com`
+
+保留兩者是為了接管既有環境中的 legacy catch-all Worker Route；Cloudflare Route 的匹配優先於同 hostname 的 Custom Domain，因此 route 必須同樣指向 `games`，否則舊 Worker 會先攔截請求。
+
+### Durable Objects
+
+目前 Wrangler binding：
+
+- `ROOMS → GameRoom`（SQLite 既有 namespace）
+- `BOARDVERSE_DB_DO → GameRoom`（使用同一既有 class 的獨立 named object 作 SQL persistence fallback）
 
 ### D1
 
