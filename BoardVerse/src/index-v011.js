@@ -4,10 +4,11 @@ import { withDatabaseEnv } from "./core/db.js";
 import { BoardVerseDb as AppBoardVerseDb } from "./db/BoardVerseDb.js";
 import { hardenPieceThemeHtml } from "./ui/piece-theme.js";
 
-// Keep the historical class exports alive because Cloudflare refuses to upload
-// any new version while an existing Durable Object namespace still depends on
-// them. The v0.1.1 namespaces below are separate, so no existing objects are
-// deleted or implicitly migrated.
+// Keep historical Durable Object class exports alive. Cloudflare already has a
+// live SQLite namespace for GameRoom, so production reuses that namespace
+// instead of provisioning another one. A distinct named GameRoom object
+// ("primary") is used as the SQL persistence backend; its storage is isolated
+// from every room object by Durable Object ID.
 export class BoardVerseDb extends AppBoardVerseDb {}
 export class BoardVerseDbV011 extends BoardVerseDb {}
 
@@ -15,7 +16,24 @@ export class GameRoom extends AppGameRoom {
   constructor(ctx, env) {
     const effectiveEnv = withDatabaseEnv(env);
     super(ctx, effectiveEnv);
+    this.ctx = ctx;
     this.env = effectiveEnv;
+  }
+
+  query(mode, sql, binds = []) {
+    const values = Array.isArray(binds) ? binds : [];
+    const cursor = this.ctx.storage.sql.exec(String(sql || ""), ...values);
+    const rows = cursor.toArray();
+    const meta = {
+      changes: Number(cursor.rowsWritten || 0),
+      rows_read: Number(cursor.rowsRead || 0),
+      rows_written: Number(cursor.rowsWritten || 0),
+    };
+    if (mode === "first") return rows[0] || null;
+    if (mode === "all") return { success: true, results: rows, meta };
+    if (mode === "run") return { success: true, meta };
+    if (mode === "exec") return { success: true, meta };
+    throw new Error(`Unsupported database query mode: ${mode}`);
   }
 }
 export class GameRoomV011 extends GameRoom {}
