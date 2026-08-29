@@ -1,0 +1,41 @@
+name: BoardVerse live production surface smoke
+
+on:
+  push:
+    branches: [boardverse-finish-visible-deploy-v011]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify live production surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          base='https://xn--gmqt6w03b11v.ray2025.com'
+
+          home="$(curl -fsSL --retry 3 --retry-delay 2 "$base/")"
+          printf '%s' "$home" | grep -q 'href="/login"'
+          printf '%s' "$home" | grep -q 'href="/register"'
+          printf '%s' "$home" | grep -q 'href="/report"'
+          printf '%s' "$home" | grep -q 'href="/admin"'
+          printf '%s' "$home" | grep -q 'v0.1.1'
+
+          admin_headers="$(mktemp)"
+          curl -fsS -o /dev/null -D "$admin_headers" "$base/admin"
+          grep -Eq '^location: .*/admin/\r?$' "$admin_headers"
+
+          report="$(curl -fsSL "$base/report")"
+          printf '%s' "$report" | grep -q 'cf-turnstile'
+
+          register="$(curl -fsSL "$base/register")"
+          printf '%s' "$register" | grep -q '註冊'
+
+          login="$(curl -fsSL "$base/login")"
+          printf '%s' "$login" | grep -q '登入'
+
+          admin_login="$(curl -fsSL "$base/admin/")"
+          printf '%s' "$admin_login" | grep -Eq '管理|Admin|登入'
+
+          echo 'LIVE_SURFACE_SMOKE_PASS'
