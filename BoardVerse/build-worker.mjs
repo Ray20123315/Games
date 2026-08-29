@@ -1,17 +1,16 @@
 import { spawnSync } from "node:child_process";
-import { installWranglerCiWrapper, hasWranglerCiWrapper } from "./scripts/wrangler-ci-wrapper.mjs";
 
 const branch = process.env.WORKERS_CI_BRANCH || "local";
 const isWorkersBuild = Boolean(process.env.WORKERS_CI);
 const isProduction = isWorkersBuild && branch === "main";
-const targetWorker = "crimson-haze-0a4d";
-const connectedWorkerOverride = process.env.WRANGLER_CI_OVERRIDE_NAME || "(none)";
+const targetWorker = "games";
+const connectedWorker = process.env.WRANGLER_CI_OVERRIDE_NAME || "(none)";
 
-function run(label, command, args, env = process.env) {
+function run(label, command, args) {
   console.log(`[boardverse-build] ${label}`);
   const result = spawnSync(command, args, {
     stdio: "inherit",
-    env,
+    env: process.env,
     shell: false,
   });
   if (result.error) throw result.error;
@@ -20,19 +19,15 @@ function run(label, command, args, env = process.env) {
   }
 }
 
-if (isWorkersBuild) {
-  installWranglerCiWrapper({ expectedWorker: targetWorker });
-  if (!hasWranglerCiWrapper()) {
-    throw new Error("Workers CI Wrangler wrapper installation verification failed");
-  }
-  console.log(
-    `[boardverse-build] installed CI Wrangler deploy wrapper; deploy ignores connected-worker override=${connectedWorkerOverride} and uses ${targetWorker}`,
+if (isWorkersBuild && connectedWorker !== targetWorker) {
+  throw new Error(
+    `Workers Builds connected Worker ${connectedWorker} does not match canonical target ${targetWorker}`,
   );
 }
 
 console.log(
   `[boardverse-build] validating BoardVerse v0.1.1; branch=${branch}; production=${isProduction}; ` +
-    `connected-worker-override=${connectedWorkerOverride}; live-target=${targetWorker}`,
+    `connected-worker=${connectedWorker}; live-target=${targetWorker}`,
 );
 run("full regression suite", "npm", ["test"]);
 run("Wrangler live-worker dry-run", "npx", [
@@ -47,8 +42,8 @@ run("Wrangler live-worker dry-run", "npx", [
 
 if (isProduction) {
   console.log(
-    `[boardverse-build] production validation complete; Cloudflare Deploy command will perform the single live deploy to ${targetWorker}`,
+    `[boardverse-build] production validation complete; Cloudflare Deploy command will deploy connected Worker ${targetWorker}`,
   );
 } else {
-  console.log("[boardverse-build] preview/local build validation complete; no live deployment performed by build command");
+  console.log("[boardverse-build] preview/local validation complete; no live deployment performed by build command");
 }

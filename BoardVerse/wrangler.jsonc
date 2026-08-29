@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "crimson-haze-0a4d",
+  "name": "games",
   "main": "src/index-v011.js",
   "compatibility_date": "2026-08-28",
   "workers_dev": false,
