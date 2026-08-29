@@ -13,7 +13,7 @@ function syncCreateVoice(){
     if(box.checked){box.checked=false;box.dispatchEvent(new Event('change',{bubbles:true}))}
     box.disabled=true;box.dataset.bvLoginDisabled='1';box.title=voiceHintText();
     if(!hint){hint=document.createElement('span');hint.id='bvVoiceLoginHint';hint.className='small muted';hint.style.marginLeft='8px';box.parentElement&&box.parentElement.appendChild(hint)}
-    if(hint)hint.textContent=voiceHintText();
+    if(hint&&hint.textContent!==voiceHintText())hint.textContent=voiceHintText();
   }else{
     if(box.dataset.bvLoginDisabled==='1'){delete box.dataset.bvLoginDisabled;if((byId('gameId')||{}).value!=='qiguo')box.disabled=false}
     box.removeAttribute('title');if(hint)hint.remove();
@@ -25,7 +25,8 @@ function renderRoomVoice(feature){setTimeout(function(){
   if(feature.voiceLoginRequired||!feature.myUserId){if(join)join.classList.add('hidden');if(status){status.classList.remove('hidden');status.textContent=voiceHintText()}}
 },0)}
 function checkAuth(){fetch('/api/voice-entitlement',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()}).then(function(d){loggedIn=!!d.allowed;authKnown=true;syncCreateVoice()}).catch(function(){loggedIn=false;authKnown=true;syncCreateVoice()})}
-function boot(){checkAuth();syncCreateVoice();var o=new MutationObserver(syncCreateVoice);o.observe(document.body,{childList:true,subtree:true});document.addEventListener('change',function(e){if(e.target&&e.target.id==='gameId')setTimeout(syncCreateVoice,0)},true)}
+function boot(){checkAuth();syncCreateVoice();setTimeout(syncCreateVoice,0);document.addEventListener('change',function(e){if(e.target&&e.target.id==='gameId')setTimeout(syncCreateVoice,0)},true)}
+window.addEventListener('boardverse:create-extras-mounted',function(){syncCreateVoice()});
 window.addEventListener('boardverse:feature',function(e){renderRoomVoice(e.detail)});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

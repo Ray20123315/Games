@@ -22,6 +22,8 @@ export function ensureFeatureState(room, now = Date.now()) {
       ownerGraceMs: null,
       ownerDisconnectedAt: null,
       closed: false,
+      adminPaused: false,
+      adminPausedAt: null,
       playerChatSlowMs: 0,
       spectatorChatSlowMs: 0,
       memberUsers: {},
@@ -37,6 +39,22 @@ export function ensureFeatureState(room, now = Date.now()) {
   if (!bv.deadlines || typeof bv.deadlines !== "object") bv.deadlines = {};
   if (!bv.memberUsers || typeof bv.memberUsers !== "object") bv.memberUsers = {};
   if (!bv.clockConfig) bv.clockConfig = { mode: "untimed" };
+  if (typeof bv.adminPaused !== "boolean") bv.adminPaused = false;
+  if (!bv.adminPaused) bv.adminPausedAt = null;
+  if (bv.adminPaused) {
+    if (!bv.adminPausedOffline || typeof bv.adminPausedOffline !== "object") bv.adminPausedOffline = {};
+    for (const member of room.members || []) {
+      if (!member || member.connected || bv.adminPausedOffline[member.id] != null) continue;
+      const deadline = Number(member.offlineDeadline);
+      const remaining = Number.isFinite(deadline) ? Math.max(1000, deadline - now) : 60_000;
+      bv.adminPausedOffline[member.id] = Math.min(60_000, remaining);
+    }
+    const owner = (room.members || []).find((member) => member?.id === room.ownerId) || null;
+    if (owner && !owner.connected && bv.adminPausedOwnerGraceMs == null && Number(bv.ownerGraceMs) > 0) {
+      const disconnectedAt = Number(bv.ownerDisconnectedAt || now);
+      bv.adminPausedOwnerGraceMs = Math.max(1000, Math.min(Number(bv.ownerGraceMs), disconnectedAt + Number(bv.ownerGraceMs) - now));
+    }
+  }
   bv.clockConfig = normalizeClockConfig(bv.clockConfig);
   for (const id of room.seats || []) if (id && !(id in bv.ready)) bv.ready[id] = room.status === "playing";
   for (const id of Object.keys(bv.ready)) if (!(room.seats || []).includes(id)) delete bv.ready[id];

@@ -8,9 +8,14 @@ function inlineScripts(html){return [...String(html).matchAll(/<script(?:\s[^>]*
 for(const [name,html] of [['bridge',BRIDGE_SCRIPT],['enhance',ENHANCE_SCRIPT]]){const scripts=inlineScripts(html);assert.equal(scripts.length,1,name);new vm.Script(scripts[0],{filename:name+'.js'})}
 const legacyBadge='<html><body><span class="small muted">v0.0.29</span></body></html>';
 const upgradedBadge=enhanceLegacyHtml(legacyBadge);
-assert.match(upgradedBadge,/<span class="small muted">v0\.1\.1<\/span>/,'public version badge must use product version');
+assert.match(upgradedBadge,/<span class="small muted">v0\.1\.2<\/span>/,'public version badge must use product version');
 assert.doesNotMatch(upgradedBadge,/>v0\.0\.29<\/span>/,'legacy runtime version must not leak into public badge');
 const replay=replayDocument({id:'r',game_type:'gomoku',variant:null,players:[],result:{reason:'ok'},timeControl:{mode:'untimed'},finished_at:1,events:[]});for(const [i,src] of inlineScripts(replay).entries())new vm.Script(src,{filename:`replay-${i}.js`});
 const account=accountPage({username_display:'u',email_normalized:'u@example.com'},{level:1,name:'新進棋友',gp:0,reputation:100,presetSlots:1},[]);for(const [i,src] of inlineScripts(account).entries())new vm.Script(src,{filename:`account-${i}.js`});
-const admin=adminDashboardPage();for(const [i,src] of inlineScripts(admin).entries())new vm.Script(src,{filename:`admin-${i}.js`});
+const admin=await adminDashboardPage().text();const adminScripts=inlineScripts(admin);assert.equal(adminScripts.length,1,'admin workbench should have one inline script');for(const [i,src] of adminScripts.entries())new vm.Script(src,{filename:`admin-${i}.js`});
+assert.doesNotMatch(BRIDGE_SCRIPT, /B\[k\]=NativeWS\[k\]/, 'WebSocket wrapper must not overwrite readonly static constants');
+assert.match(ENHANCE_SCRIPT, /syncMultiplayerGameOptions=function\(\)\{\}/, 'multiplayer sync callback must live in enhancement scope');
+assert.doesNotMatch(ENHANCE_SCRIPT, /prompt\(text\('Preset/, 'Preset naming must not use native prompt');
+assert.match(ENHANCE_SCRIPT, /bvPresetNameOverlay/, 'Preset naming must use the custom modal');
+assert.match(ENHANCE_SCRIPT, /bv-code-shell/, 'custom room code must use the custom field shell');
 console.log('browser-scripts.test: PASS');

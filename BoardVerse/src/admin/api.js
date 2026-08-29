@@ -8,7 +8,7 @@ import { listRiskFlags, reviewRiskFlag } from "../risk/risk.js";
 import { applyDiscipline, confirmCheatingDefault } from "../risk/discipline.js";
 import { createAdminActivation } from "../auth/users.js";
 
-const LIMIT = 20;
+const LIMIT = 50;
 const MAX_BULK_USERS = 20;
 
 const cleanReason = (v) => {
@@ -70,6 +70,41 @@ function disciplineValue(body, action) {
     return Date.now() + days * 86_400_000;
   }
   return body.value;
+}
+
+const ROOM_ACTIONS = Object.freeze({
+  pause: { path: "/admin/pause-room", audit: "room.pause" },
+  resume: { path: "/admin/resume-room", audit: "room.resume" },
+  terminate: { path: "/admin/terminate-game", audit: "room.terminate_game" },
+  close: { path: "/admin/close-room", audit: "room.close" },
+});
+function roomIdValue(value) {
+  const roomId=String(value||"").trim().toUpperCase();
+  if(!ROOM_CODE_RE.test(roomId)) throw new HttpError(400,"room_invalid","房號格式錯誤："+(roomId||"(空白)"));
+  return roomId;
+}
+async function invokeRoomAction(env, roomId, action, reason) {
+  const spec=ROOM_ACTIONS[action];
+  if(!spec) throw new HttpError(400,"room_action_invalid","不支援的房間操作。");
+  if(!env?.ROOMS) throw new HttpError(503,"rooms_unavailable","ROOMS Durable Object 尚未綁定。");
+  const res=await env.ROOMS.getByName(roomId).fetch(new Request("https://boardverse.internal"+spec.path,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({reason})}));
+  const data=await res.json().catch(()=>({}));
+  if(!res.ok) throw new HttpError(res.status,"room_action_failed",data.message||"房間操作失敗。");
+  return data;
+}
+async function auditedRoomAction(db, env, actor, roomId, action, reason) {
+  const data=await invokeRoomAction(env,roomId,action,reason);
+  await audit(db,ROOM_ACTIONS[action].audit,{adminActor:actor,targetType:"room",targetId:roomId,reason,after:{action,...data}});
+  return {roomId,ok:true,...data};
+}
+async function roomLiveState(env,row) {
+  if(!env?.ROOMS || row.status==="closed") return {...row,admin_paused:false,admin_paused_at:null};
+  try {
+    const res=await env.ROOMS.getByName(row.room_id).fetch("https://boardverse.internal/admin/state");
+    if(!res.ok) return {...row,admin_paused:false,admin_paused_at:null};
+    const state=await res.json();
+    return {...row,admin_paused:!!state.paused,admin_paused_at:state.pausedAt||null,live_status:state.status||row.status,live_closed:!!state.closed};
+  } catch { return {...row,admin_paused:false,admin_paused_at:null}; }
 }
 
 export async function adminApi({ db, env, request, path, url, actor }) {
@@ -156,26 +191,32 @@ export async function adminApi({ db, env, request, path, url, actor }) {
   }
 
   if (path === "/admin/api/rooms" && request.method === "GET") {
-    return all(db, `SELECT room_id,room_name,game_type,status,private_room,voice_enabled,players_json,spectator_count,last_activity_at
-      FROM active_rooms ORDER BY last_activity_at DESC LIMIT ?`, LIMIT);
+    const rows=await all(db,"SELECT * FROM active_rooms ORDER BY last_activity_at DESC LIMIT ?",LIMIT);
+    return Promise.all(rows.map((row)=>roomLiveState(env,row)));
+  }
+  if (path === "/admin/api/rooms/batch" && request.method === "POST") {
+    const b=await request.json(), action=String(b.action||"");
+    if(!ROOM_ACTIONS[action]) throw new HttpError(400,"room_action_invalid","批量房間操作不合法。");
+    const reason=cleanReason(b.reason), raw=Array.isArray(b.roomIds)?b.roomIds:[];
+    const roomIds=[...new Set(raw.map((id)=>roomIdValue(id)))];
+    if(!roomIds.length) throw new HttpError(400,"room_ids_required","請至少選擇一個房間。");
+    if(roomIds.length>LIMIT) throw new HttpError(400,"room_ids_limit","一次最多操作 "+LIMIT+" 個房間。");
+    const results=await Promise.all(roomIds.map(async(roomId)=>{try{return await auditedRoomAction(db,env,actor,roomId,action,reason)}catch(error){return{roomId,ok:false,code:error?.code||"room_action_failed",message:error?.message||"操作失敗。"}}}));
+    return {ok:results.every((x)=>x.ok),action,requested:roomIds.length,succeeded:results.filter((x)=>x.ok).length,failed:results.filter((x)=>!x.ok).length,results};
+  }
+  if (path === "/admin/api/room/pause" && request.method === "POST") {
+    const b=await request.json(); return auditedRoomAction(db,env,actor,roomIdValue(b.roomId),"pause",cleanReason(b.reason));
+  }
+  if (path === "/admin/api/room/resume" && request.method === "POST") {
+    const b=await request.json(); return auditedRoomAction(db,env,actor,roomIdValue(b.roomId),"resume",cleanReason(b.reason));
   }
 
   if (path === "/admin/api/room/terminate-game" && request.method === "POST") {
-    const b = await request.json(), roomId = String(b.roomId || "").toUpperCase(), reason = cleanReason(b.reason);
-    if (!ROOM_CODE_RE.test(roomId)) throw new HttpError(400, "room_invalid", "房號格式錯誤。");
-    const res = await env.ROOMS.getByName(roomId).fetch(new Request("https://boardverse.internal/admin/terminate-game", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason }) }));
-    if (!res.ok) throw new HttpError(res.status, "room_action_failed", (await res.json().catch(() => ({}))).message || "操作失敗。");
-    await audit(db, "room.terminate_game", { adminActor: actor, targetType: "room", targetId: roomId, reason });
-    return { ok: true };
+    const b=await request.json(); return auditedRoomAction(db,env,actor,roomIdValue(b.roomId),"terminate",cleanReason(b.reason));
   }
 
   if (path === "/admin/api/room/close" && request.method === "POST") {
-    const b = await request.json(), roomId = String(b.roomId || "").toUpperCase(), reason = cleanReason(b.reason);
-    if (!ROOM_CODE_RE.test(roomId)) throw new HttpError(400, "room_invalid", "房號格式錯誤。");
-    const res = await env.ROOMS.getByName(roomId).fetch(new Request("https://boardverse.internal/admin/close-room", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ reason }) }));
-    if (!res.ok) throw new HttpError(res.status, "room_action_failed", (await res.json().catch(() => ({}))).message || "操作失敗。");
-    await audit(db, "room.close", { adminActor: actor, targetType: "room", targetId: roomId, reason });
-    return { ok: true };
+    const b=await request.json(); return auditedRoomAction(db,env,actor,roomIdValue(b.roomId),"close",cleanReason(b.reason));
   }
 
   if (path === "/admin/api/replays" && request.method === "GET") {
