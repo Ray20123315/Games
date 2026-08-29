@@ -24,4 +24,5 @@ jobs:
           const html=`<!doctype html><meta charset="utf-8"><style>${style}</style><body><div id="stone" class="stone white"></div><span id="chess" class="chess-piece white">♔</span><span id="qiguo" class="qiguo-piece" style="background:#f2eee3;color:#17130b">秦</span><pre id="out"></pre><script>function snap(cls){document.body.className=cls;let a=getComputedStyle(stone),b=getComputedStyle(chess),c=getComputedStyle(qiguo);return{theme:cls,stoneBg:a.backgroundColor,stoneImage:a.backgroundImage,chessColor:b.color,qiguoBg:c.backgroundColor,qiguoColor:c.color}}out.textContent=JSON.stringify([snap('page-theme-white'),snap('page-theme-black')]);</script></body>`;
           await writeFile('piece-theme-test.html',html);
           NODE
-          google-chrome --headless --no-sandbox --disable-gpu --dump-dom file://$PWD/piece-theme-test.html | grep -o '\[{&quot;theme&quot;.*\]' | sed 's/&quot;/"/g'
+          google-chrome --headless --no-sandbox --disable-gpu --dump-dom file://$PWD/piece-theme-test.html > piece-theme-dump.html 2>/dev/null
+          grep '<pre id="out">' piece-theme-dump.html
