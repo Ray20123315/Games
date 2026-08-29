@@ -1,12 +1,14 @@
-name: Inspect v0.1.2 fresh homepage
+name: Verify v0.1.2 final
 on:
   push:
     branches: [feat/admin-workbench-v0.1.2]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 jobs:
-  inspect:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: BoardVerse
@@ -15,7 +17,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --ignore-scripts
+      - name: Install project dependencies
+        run: npm install --ignore-scripts
+      - name: Full regression suite
+        run: npm test
       - name: Install browser driver
         run: npm install --no-save --ignore-scripts puppeteer-core@24
       - name: Find Chrome
@@ -24,45 +29,19 @@ jobs:
           test -n "$CHROME"
           echo "CHROME=$CHROME" >> "$GITHUB_ENV"
           "$CHROME" --version
-      - name: Inspect production HTTP
-        run: |
-          curl -fsS -D /tmp/prod.headers -o /tmp/prod.html --max-time 20 https://xn--gmqt6w03b11v.ray2025.com/
-          head -40 /tmp/prod.headers
-          echo "prod_bytes=$(wc -c < /tmp/prod.html)"
-          grep -o 'v0\.[0-9][0-9.]*' /tmp/prod.html | head || true
-          node test/make-home-variants.mjs
-      - name: Fresh Chrome against production
-        continue-on-error: true
-        env:
-          TARGET_URL: https://xn--gmqt6w03b11v.ray2025.com/
-        run: timeout 35s node test/fresh-home-inspect.mjs
-      - name: Serve isolated production variants
-        run: |
-          cd /tmp
-          python3 -m http.server 8123 >/tmp/static.log 2>&1 &
-          echo $! >/tmp/static.pid
-          sleep 1
-      - name: Identify locking script layer
-        run: |
-          set +e
-          for variant in no-bridge no-legacy no-enhance no-i18n no-policy no-pause; do
-            echo "===== $variant ====="
-            TARGET_URL="http://127.0.0.1:8123/prod-$variant.html" timeout 22s node test/fresh-home-inspect.mjs
-            echo "exit=$?"
-          done
-          exit 0
-      - name: Start local Worker
+      - name: Start branch Worker
         run: |
           npx wrangler dev --local --port 8787 > /tmp/wrangler.log 2>&1 &
           echo $! > /tmp/wrangler.pid
-          for i in $(seq 1 40); do curl -fsS http://127.0.0.1:8787/ >/dev/null 2>&1 && exit 0; sleep 1; done
+          for i in $(seq 1 45); do curl -fsS http://127.0.0.1:8787/ >/dev/null 2>&1 && exit 0; sleep 1; done
           cat /tmp/wrangler.log
           exit 1
-      - name: Fresh Chrome against branch Worker
-        continue-on-error: true
+      - name: Fresh browser homepage must stay responsive
         env:
           TARGET_URL: http://127.0.0.1:8787/
         run: timeout 35s node test/fresh-home-inspect.mjs
+      - name: Production deploy dry-run
+        run: npx wrangler deploy --dry-run --outdir dist --config wrangler.jsonc
       - name: Wrangler log
         if: always()
-        run: tail -100 /tmp/wrangler.log 2>/dev/null || true
+        run: tail -120 /tmp/wrangler.log 2>/dev/null || true
