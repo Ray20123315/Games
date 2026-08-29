@@ -20,7 +20,7 @@ jobs:
         with:
           node-version: 22
       - name: Apply patch
-        run: node tools/patch-v012-followups2.mjs
+        run: node tools/patch-v012-followups3.mjs
       - name: Install dependencies
         run: npm install --ignore-scripts
       - name: Full regression suite
