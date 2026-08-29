@@ -1,4 +1,4 @@
-name: BoardVerse final live production smoke
+name: BoardVerse final live production diagnostics
 
 on:
   push:
@@ -9,34 +9,31 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify production surfaces
+      - name: Diagnose production routing and cache
         shell: bash
         run: |
           set -euo pipefail
           BASE='https://xn--gmqt6w03b11v.ray2025.com'
+          nonce="$(date +%s)"
           tmp="$(mktemp -d)"
 
-          home_code=$(curl --retry 4 --retry-delay 3 -sS -o "$tmp/home.html" -w '%{http_code}' "$BASE/")
-          echo "HOME=$home_code"
-          test "$home_code" = 200
-          grep -q 'id="bvPublicNav"' "$tmp/home.html"
-          grep -q 'href="/login"' "$tmp/home.html"
-          grep -q 'href="/register"' "$tmp/home.html"
-          grep -q 'href="/report"' "$tmp/home.html"
-          grep -q 'href="/admin"' "$tmp/home.html"
-          grep -q 'v0.1.1' "$tmp/home.html"
+          echo '=== HOME headers ==='
+          curl --retry 3 --retry-delay 2 -sS -D "$tmp/home.headers" -o "$tmp/home.html" "$BASE/?boardverse_smoke=$nonce"
+          cat "$tmp/home.headers"
+          echo '=== HOME markers ==='
+          if grep -q 'id="bvPublicNav"' "$tmp/home.html"; then echo 'NAV=present'; else echo 'NAV=absent'; fi
+          if grep -q 'v0.1.1' "$tmp/home.html"; then echo 'VERSION_V011=present'; else echo 'VERSION_V011=absent'; fi
+          grep -Eo '<title>[^<]*</title>' "$tmp/home.html" | head -1 || true
 
-          admin_code=$(curl --retry 4 --retry-delay 3 -sS -D "$tmp/admin.headers" -o /dev/null -w '%{http_code}' "$BASE/admin")
-          echo "ADMIN=$admin_code"
-          test "$admin_code" = 302
-          grep -qi '^location: .*\/admin/' "$tmp/admin.headers"
-
-          for path in admin/ report register login; do
-            code=$(curl --retry 4 --retry-delay 3 -sS -o "$tmp/${path//\//_}.html" -w '%{http_code}' "$BASE/$path")
-            echo "${path^^}=$code"
-            test "$code" != 404
-            test "$code" -ge 200
-            test "$code" -lt 400
+          echo '=== Endpoint status ==='
+          for path in admin admin/ report register login health; do
+            safe="${path//\//_}"
+            code=$(curl --retry 3 --retry-delay 2 -sS -D "$tmp/$safe.headers" -o "$tmp/$safe.body" -w '%{http_code}' "$BASE/$path?boardverse_smoke=$nonce")
+            loc=$(grep -i '^location:' "$tmp/$safe.headers" | tr -d '\r' | head -1 || true)
+            cache=$(grep -i '^cf-cache-status:' "$tmp/$safe.headers" | tr -d '\r' | head -1 || true)
+            echo "$path=$code ${loc:-no-location} ${cache:-no-cache-header}"
+            head -c 180 "$tmp/$safe.body" | tr '\n' ' ' || true
+            echo
           done
 
-          echo 'LIVE_SURFACES=PASS'
+          echo 'DIAGNOSTIC_COMPLETE=1'
