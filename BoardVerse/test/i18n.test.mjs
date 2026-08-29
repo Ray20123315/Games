@@ -44,6 +44,8 @@ if (adminPages) {
   assert.match(adminPages, /'回放','回放','Replays'/);
   assert.match(adminPages, /'系統設定','系统设置','System settings'/);
   assert.match(adminPages, /'稽核記錄','审计记录','Audit log'/);
-  assert.match(adminPages, /'使用者名稱','用户名','Username'/);
+  assert.match(adminPages, /'批量管理','批量管理','Bulk manage'/);
+  assert.match(adminPages, /'管理使用者','管理用户','Manage user'/);
+  assert.match(adminPages, /'操作結果','操作结果','Results'/);
 }
 console.log("i18n.test: PASS (zh-Hant, zh-Hans, en)");

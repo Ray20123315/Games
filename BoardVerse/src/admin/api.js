@@ -9,6 +9,8 @@ import { applyDiscipline, confirmCheatingDefault } from "../risk/discipline.js";
 import { createAdminActivation } from "../auth/users.js";
 
 const LIMIT = 20;
+const MAX_BULK_USERS = 20;
+
 const cleanReason = (v) => {
   const s = String(v || "").trim().slice(0, 1000);
   if (!s) throw new HttpError(400, "reason_required", "此管理操作必須填寫原因。");
@@ -42,8 +44,32 @@ async function resolveChatSubject(db, env, body) {
   const matches = (Array.isArray(state.messages) ? state.messages : []).filter((m) => m?.senderKind === "guest" && nameKey(m?.name) === key);
   const ids = [...new Set(matches.map((m) => String(m.senderId || "")).filter(Boolean))];
   if (!ids.length) throw new HttpError(404, "guest_not_found", `找不到近期訪客「${visibleName}」。`);
-  if (ids.length > 1) throw new HttpError(409, "guest_name_ambiguous", "有多個同名訪客，請直接從聊天室訊息列點選禁言。");
+  if (ids.length > 1) throw new HttpError(409, "guest_name_ambiguous", "有多個同名訪客，請直接從聊天室訊息列點選管理。");
   return { subjectType, subjectId: ids[0], subjectName: visibleName };
+}
+
+function cleanBulkNames(body) {
+  const source = Array.isArray(body.usernames) ? body.usernames : [body.username || body.user || body.userId];
+  const out = [];
+  const seen = new Set();
+  for (const value of source) {
+    const raw = String(value || "").normalize("NFKC").trim();
+    const key = nameKey(raw);
+    if (!raw || seen.has(key)) continue;
+    seen.add(key);
+    out.push(raw);
+  }
+  if (!out.length) throw new HttpError(400, "users_required", "請至少選擇一位使用者。");
+  if (out.length > MAX_BULK_USERS) throw new HttpError(400, "too_many_users", `單次最多可操作 ${MAX_BULK_USERS} 位使用者。`);
+  return out;
+}
+
+function disciplineValue(body, action) {
+  if (action === "suspend") {
+    const days = Math.max(1, Math.min(3650, Math.trunc(Number(body.days ?? body.value) || 1)));
+    return Date.now() + days * 86_400_000;
+  }
+  return body.value;
 }
 
 export async function adminApi({ db, env, request, path, url, actor }) {
@@ -76,6 +102,38 @@ export async function adminApi({ db, env, request, path, url, actor }) {
       all(db, "SELECT amount,reason,created_at FROM gp_events WHERE user_id=? ORDER BY created_at DESC LIMIT 30", user.id),
     ]);
     return { user: row, flags, actions, gpEvents };
+  }
+
+  if (path === "/admin/api/users/bulk-discipline" && request.method === "POST") {
+    const b = await request.json();
+    const usernames = cleanBulkNames(b);
+    const action = String(b.action || "");
+    const reason = cleanReason(b.reason);
+    const results = [];
+    for (const requestedName of usernames) {
+      try {
+        const user = await resolveUserByName(db, requestedName);
+        if (action === "confirmed_cheating") {
+          const days = Math.max(1, Math.min(3650, Math.trunc(Number(b.days ?? b.value) || 7)));
+          await confirmCheatingDefault(db, user.id, {
+            reason,
+            suspendedUntil: Date.now() + days * 86_400_000,
+            adminActor: actor,
+          });
+        } else {
+          await applyDiscipline(db, user.id, action, {
+            reason,
+            value: disciplineValue(b, action),
+            adminActor: actor,
+          });
+        }
+        results.push({ username: user.username_display, ok: true });
+      } catch (error) {
+        results.push({ username: requestedName, ok: false, message: String(error?.message || error) });
+      }
+    }
+    const succeeded = results.filter((r) => r.ok).length;
+    return { total: results.length, succeeded, failed: results.length - succeeded, results };
   }
 
   if (path === "/admin/api/user/discipline" && request.method === "POST") {
