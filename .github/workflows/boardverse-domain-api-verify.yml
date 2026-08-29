@@ -1,0 +1,31 @@
+name: BoardVerse Workers Domains API handoff verification
+
+on:
+  push:
+    branches: [boardverse-finish-visible-deploy-v011]
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install dependencies
+        working-directory: BoardVerse
+        run: npm install --no-audit --no-fund
+      - name: Full regression suite
+        working-directory: BoardVerse
+        run: npm test
+      - name: Production dry-run
+        run: npx --yes wrangler@4.127.1 deploy --dry-run --config wrangler.jsonc --outdir /tmp/boardverse-domain-api
+      - name: Validate deploy adapter syntax
+        run: node --check scripts/wrangler-ci.cjs
+      - name: Assert safe domain handoff
+        run: |
+          ! grep -q '"routes"' wrangler.jsonc
+          grep -q "apiRequest('PUT', '/workers/domains'" scripts/wrangler-ci.cjs
+          grep -q "service: 'games'" scripts/wrangler-ci.cjs
+          grep -q 'custom domain attached and verified' scripts/wrangler-ci.cjs
