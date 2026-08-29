@@ -1,14 +1,16 @@
 import app, { GameRoom as AppGameRoom, GlobalChat as AppGlobalChat } from "./index.js";
 import { APP_VERSION } from "./core/config.js";
-import { withDatabaseEnv } from "./core/db.js";
+import { requireDb, withDatabaseEnv } from "./core/db.js";
 import { sessionUser } from "./auth/sessions.js";
-import { adminPlayerEntitlement } from "./admin/auth.js";
-import { errorJson, json } from "./core/http.js";
+import { adminPlayerEntitlement, requireAdmin } from "./admin/auth.js";
+import { errorJson, json, toErrorResponse } from "./core/http.js";
 import { BoardVerseDb as AppBoardVerseDb } from "./db/BoardVerseDb.js";
 import { hardenPieceThemeHtml } from "./ui/piece-theme.js";
 import { SITE_I18N_SCRIPT } from "./ui/site-i18n.js";
 import { FEATURE_POLICY_SCRIPT } from "./ui/feature-policy.js";
 import { injectAdminLevelPanel } from "./admin/level-ui.js";
+import { ADMIN_CONTEXT_BULK_SCRIPT } from "./admin/context-bulk-ui.js";
+import { contextAdminApi, isContextAdminApi } from "./admin/context-actions.js";
 
 // Keep historical Durable Object class exports alive. Cloudflare already has a
 // live SQLite namespace for GameRoom, so production reuses that namespace
@@ -84,10 +86,11 @@ function injectPublicNav(source, pathname) {
   return source.replace(/<body([^>]*)>/i, (match) => `${match}${nav}`);
 }
 
-function injectSiteScripts(source) {
+function injectSiteScripts(source, pathname) {
   let scripts = "";
   if (!source.includes('id="boardverse-site-i18n"')) scripts += SITE_I18N_SCRIPT;
   if (!source.includes('id="boardverse-feature-policy"')) scripts += FEATURE_POLICY_SCRIPT;
+  if (pathname.startsWith("/admin/") && !source.includes('id="boardverse-admin-context-bulk"')) scripts += ADMIN_CONTEXT_BULK_SCRIPT;
   if (!scripts) return source;
   if (/<\/head>/i.test(source)) return source.replace(/<\/head>/i, `${scripts}</head>`);
   return scripts + source;
@@ -134,6 +137,15 @@ export default {
       return Response.redirect(new URL("/admin/", requestUrl), 302);
     }
     const effectiveEnv = withDatabaseEnv(env);
+    if (isContextAdminApi(requestUrl.pathname)) {
+      try {
+        const adm = await requireAdmin(effectiveEnv, request);
+        const data = await contextAdminApi({ db: requireDb(effectiveEnv), env: effectiveEnv, request, path: requestUrl.pathname, actor: adm.user });
+        return json({ ok: true, data });
+      } catch (error) {
+        return toErrorResponse(error);
+      }
+    }
     if (requestUrl.pathname === "/api/voice-entitlement" && request.method === "GET") {
       return json({ ok: true, allowed: await hasVoiceIdentity(effectiveEnv, request) });
     }
@@ -143,7 +155,7 @@ export default {
     const type = response.headers.get("content-type") || "";
     if (!type.includes("text/html")) return response;
     const withAdminLevel = injectAdminLevelPanel(await response.text(), requestUrl.pathname);
-    const localized = injectSiteScripts(injectPublicNav(withAdminLevel, requestUrl.pathname));
+    const localized = injectSiteScripts(injectPublicNav(withAdminLevel, requestUrl.pathname), requestUrl.pathname);
     const body = hardenPieceThemeHtml(localized);
     const headers = new Headers(response.headers);
     headers.delete("content-length");
