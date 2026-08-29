@@ -5,7 +5,7 @@ const entry = fs.readFileSync(new URL('../src/index-v011.js', import.meta.url), 
 const preview = fs.readFileSync(new URL('../src/cloudflare-preview.js', import.meta.url), 'utf8');
 const routes = fs.readFileSync(new URL('../src/index.js', import.meta.url), 'utf8');
 
-for (const href of ['/login', '/register', '/report', '/admin']) {
+for (const href of ['/login', '/register', '/account', '/report', '/admin']) {
   assert.ok(entry.includes(`href=\"${href}\"`), `public navigation must expose ${href}`);
 }
 assert.ok(entry.includes('requestUrl.pathname === \"/admin\"'), '/admin must redirect to canonical admin route');
@@ -18,4 +18,8 @@ for (const className of ['GameRoom', 'GlobalChat', 'BoardVerseDb', 'GameRoomV011
   assert.ok(preview.includes(className), `preview entry must preserve ${className} export`);
 }
 assert.match(entry, /APP_VERSION/);
+assert.match(entry, /publicNavAccount/);
+assert.match(entry, /getUserMembership/);
+assert.match(entry, /bvPublicAccount/);
+assert.match(entry, /username_display/);
 console.log('public surface test passed');

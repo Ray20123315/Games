@@ -24,6 +24,8 @@ assert.match(policy, /bvVoiceLoginHint/);
 assert.match(policy, /voiceLoginRequired/);
 assert.match(policy, /bvAdminLevelCard/);
 assert.match(policy, /action:'level_set'/);
+assert.doesNotMatch(policy, /new MutationObserver/);
+assert.match(policy, /boardverse:create-extras-mounted/);
 for (let level=1;level<=5;level++) assert.match(policy, new RegExp(`Lv\\.${level}`));
 
 console.log("feature-policy.test: PASS (ready toggle, admin pause, login-only voice, admin level)");

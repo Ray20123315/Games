@@ -13,7 +13,7 @@ function syncCreateVoice(){
     if(box.checked){box.checked=false;box.dispatchEvent(new Event('change',{bubbles:true}))}
     box.disabled=true;box.dataset.bvLoginDisabled='1';box.title=voiceHintText();
     if(!hint){hint=document.createElement('span');hint.id='bvVoiceLoginHint';hint.className='small muted';hint.style.marginLeft='8px';box.parentElement&&box.parentElement.appendChild(hint)}
-    if(hint)hint.textContent=voiceHintText();
+    if(hint&&hint.textContent!==voiceHintText())hint.textContent=voiceHintText();
   }else{
     if(box.dataset.bvLoginDisabled==='1'){delete box.dataset.bvLoginDisabled;if((byId('gameId')||{}).value!=='qiguo')box.disabled=false}
     box.removeAttribute('title');if(hint)hint.remove();
@@ -31,7 +31,8 @@ function mountAdminLevel(){
   byId('bvLevelSave').onclick=async function(){var id=byId('bvLevelUser').value.trim(),reason=byId('bvLevelReason').value.trim(),level=Number(byId('bvLevelValue').value),out=byId('bvLevelStatus');if(!id||!reason){out.textContent=text('請填 User ID 與調整原因。','请填写 User ID 与调整原因。','Enter a User ID and reason.');return}try{var r=await fetch('/admin/api/user/discipline',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({userId:id,action:'level_set',value:level,reason:reason})}),d=await r.json().catch(function(){return{}});if(!r.ok)throw new Error(d.message||'Request failed');out.textContent=text('等級已更新為 Lv.','等级已更新为 Lv.','Level updated to Lv.')+level}catch(e){out.textContent=e.message||text('更新失敗。','更新失败。','Update failed.')}};
 }
 function checkAuth(){fetch('/api/voice-entitlement',{credentials:'same-origin',cache:'no-store'}).then(function(r){return r.json()}).then(function(d){loggedIn=!!d.allowed;authKnown=true;syncCreateVoice()}).catch(function(){loggedIn=false;authKnown=true;syncCreateVoice()})}
-function boot(){mountAdminLevel();checkAuth();syncCreateVoice();var o=new MutationObserver(function(){syncCreateVoice();mountAdminLevel()});o.observe(document.body,{childList:true,subtree:true});document.addEventListener('change',function(e){if(e.target&&e.target.id==='gameId')setTimeout(syncCreateVoice,0)},true)}
+function boot(){mountAdminLevel();checkAuth();syncCreateVoice();setTimeout(function(){syncCreateVoice();mountAdminLevel()},0);document.addEventListener('change',function(e){if(e.target&&e.target.id==='gameId')setTimeout(syncCreateVoice,0)},true)}
+window.addEventListener('boardverse:create-extras-mounted',function(){syncCreateVoice()});
 window.addEventListener('boardverse:feature',function(e){renderRoomVoice(e.detail)});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
