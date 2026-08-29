@@ -1,8 +1,26 @@
-import app, { GameRoom, GlobalChat } from "./index.js";
+import app, { GameRoom as AppGameRoom, GlobalChat as AppGlobalChat } from "./index.js";
 import { APP_VERSION } from "./core/config.js";
+import { withDatabaseEnv } from "./core/db.js";
+import { BoardVerseDb } from "./db/BoardVerseDb.js";
 import { hardenPieceThemeHtml } from "./ui/piece-theme.js";
 
-export { GameRoom, GlobalChat };
+export { BoardVerseDb };
+
+export class GameRoom extends AppGameRoom {
+  constructor(ctx, env) {
+    const effectiveEnv = withDatabaseEnv(env);
+    super(ctx, effectiveEnv);
+    this.env = effectiveEnv;
+  }
+}
+
+export class GlobalChat extends AppGlobalChat {
+  constructor(ctx, env) {
+    const effectiveEnv = withDatabaseEnv(env);
+    super(ctx, effectiveEnv);
+    this.env = effectiveEnv;
+  }
+}
 
 function injectPublicNav(source, pathname) {
   if (pathname !== "/" || source.includes('id="bvPublicNav"')) return source;
@@ -16,7 +34,8 @@ export default {
     if (requestUrl.pathname === "/admin") {
       return Response.redirect(new URL("/admin/", requestUrl), 302);
     }
-    const response = await app.fetch(request, env, ctx);
+    const effectiveEnv = withDatabaseEnv(env);
+    const response = await app.fetch(request, effectiveEnv, ctx);
     const type = response.headers.get("content-type") || "";
     if (!type.includes("text/html")) return response;
     const body = hardenPieceThemeHtml(injectPublicNav(await response.text(), requestUrl.pathname));
@@ -25,6 +44,6 @@ export default {
     return new Response(body, { status: response.status, statusText: response.statusText, headers });
   },
   scheduled(event, env, ctx) {
-    return app.scheduled(event, env, ctx);
+    return app.scheduled(event, withDatabaseEnv(env), ctx);
   },
 };
