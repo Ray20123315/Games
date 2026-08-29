@@ -10,37 +10,48 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Build and simulate v0.0.27
+      - name: Full deterministic v0.0.27 build
         working-directory: BoardVerse
         run: |
           node build-worker.mjs
-          for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025 026; do node post-build-v${v}.mjs; done
-          node sim-v027.mjs
+          for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025 026 027; do node post-build-v${v}.mjs; done
           node --check worker.js
-      - name: Verify gameplay detail UI
+      - name: Verify exact output and gameplay details
         working-directory: BoardVerse
         run: |
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
           import {createHash} from 'node:crypto';
           const s=await readFile('worker.js','utf8');
+          const hash=createHash('sha256').update(s).digest('hex');
+          if(Buffer.byteLength(s)!==260235) throw new Error('unexpected bytes '+Buffer.byteLength(s));
+          if(hash!=='368863fec9b5abd195b5d0687c8645a962ca300fe74bad3f2791d343ae7209c2') throw new Error('unexpected SHA '+hash);
           const must=[
             'const APP_VERSION = "0.0.27";',
+            '3 人 · 3-2-2 合縱連橫',
             '4 人 · 2-2-2-1 合縱連橫',
             '5 人 · 2-2-1-1-1 合縱連橫',
             '6 人 · 2-1-1-1-1-1 連橫',
+            '7 人 · 一人一國',
             "playTitle.textContent=lang==='en'?'How to play':lang==='zh-Hans'?'游戏方式':'遊戲方式'",
             "settingsTitle.textContent=lang==='en'?'Rule settings':lang==='zh-Hans'?'规则设置':'規則設定'",
             "extraTitle.textContent=lang==='en'?'Additional rules':lang==='zh-Hans'?'补充规则':'補充規則'",
             'function gameplayGuide(gameId)',
             '建立房間時先選 3～7 人與抽籤方式',
             '黑先白後，輪流在棋盤交叉點落子',
+            '15×15，黑先白後',
+            '紅方先行，雙方輪流移動一枚棋子',
+            '玩法與一般象棋相同，但開局前雙方底線棋子',
             '使用 4×8 棋盤，32 子洗牌後全部蓋牌',
             '白方先行，雙方輪流走一枚棋子',
-            '黑方先行，落子必須夾住至少一列白子'
+            '黑方先行，落子必須夾住至少一列白子',
+            'if(def&&def.extraHelp)'
           ];
           for(const m of must) if(!s.includes(m)) throw new Error('missing '+m);
-          for(const old of ['[4,"4 人"],[5,"5 人"],[6,"6 人"]']) if(s.includes(old)) throw new Error('stale bare player labels remain');
+          if(s.includes('[4,"4 人"],[5,"5 人"],[6,"6 人"]')) throw new Error('stale bare player labels remain');
           console.log('V027_FINAL_BYTES='+Buffer.byteLength(s));
-          console.log('V027_FINAL_SHA256='+createHash('sha256').update(s).digest('hex'));
+          console.log('V027_FINAL_SHA256='+hash);
           NODE
+      - name: Verify Cloudflare deploy path
+        working-directory: BoardVerse
+        run: npx --yes wrangler@4.127.1 deploy --dry-run
