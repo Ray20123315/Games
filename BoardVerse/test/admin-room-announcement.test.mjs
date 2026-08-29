@@ -32,10 +32,14 @@ test("admin UI can send and clear announcements for selected rooms", () => {
   assert.match(source, /清除公告/);
 });
 
-test("room UI renders admin announcement from feature state", () => {
-  assert.match(source, /bvRoomAnnouncement/);
+test("room announcement has popup, top flashing banner, and chat reminder", () => {
+  assert.match(source, /bvRoomAnnouncementOverlay/);
+  assert.match(source, /bvAdminAnnouncementPulse/);
+  assert.match(source, /bv-announcement-flash/);
+  assert.match(source, /showPopup\(content\)/);
+  assert.match(source, /chatReminder\(content,item\.updatedAt\)/);
+  assert.match(source, /bvRoomAnnouncementChat/);
   assert.match(source, /ADMIN 房內公告/);
-  assert.match(source, /boardverse:feature/);
 });
 
 test("announcement changes are written to the admin audit log", () => {
