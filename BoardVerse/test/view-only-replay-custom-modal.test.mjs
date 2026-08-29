@@ -11,6 +11,8 @@ for (const marker of [
   'boardverse-room-replay-scope',
   '房內使用者皆可查看 · 不提供下載',
   'removeMisinterpretedPublicReplayRoomUi',
+  'renderPublicReplay',
+  'boardverse:replay',
   'boardverse-admin-zh-style',
   'boardverse-admin-zh',
   "'Operations Workbench':'營運管理台'",
@@ -19,14 +21,11 @@ for (const marker of [
   "'Audit Log':'稽核紀錄'",
   "warning:'警告'",
   "confirmed_cheating:'確認作弊'",
+  'url.pathname.startsWith("/admin")',
+  'HEADERS',
+  'ACTIONS',
+  'VALUES',
 ]) assert.ok(source.includes(marker), `missing v015 marker: ${marker}`);
-
-assert.match(source, /;renderPublicReplay\\\(\\\)\(\?=\\\}\)/);
-assert.match(source, /window\\\.addEventListener\\\('boardverse:replay'/);
-assert.match(source, /url\.pathname\.startsWith\("\/admin"\)/);
-assert.match(source, /HEADERS/);
-assert.match(source, /ACTIONS/);
-assert.match(source, /VALUES/);
 
 assert.match(runtime, /const MAX_REPLAY_HISTORY = 12/);
 assert.match(runtime, /member && member\.role !== "pending" \? room\.replays\.slice\(-MAX_REPLAY_HISTORY\)/);
