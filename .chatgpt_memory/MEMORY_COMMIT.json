@@ -1,0 +1,8 @@
+{
+  "state": "DIRTY",
+  "task": "host-kick-any-phase",
+  "revision": 1,
+  "baseline_sha": "2cbbb9213986b275861f371feb97b5bfef5eeaee",
+  "branch": "fix/host-kick-any-phase-v3",
+  "next_action": "verify remote branch and open PR"
+}

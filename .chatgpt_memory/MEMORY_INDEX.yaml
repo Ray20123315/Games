@@ -1,0 +1,7 @@
+state: DIRTY
+active_canonical: ACTIVE_TASK.md
+current_state: CURRENT_STATE.md
+requirements: USER_REQUIREMENTS.md
+decisions: DECISIONS.md
+verification: VERIFY.md
+next_action: verify remote branch and open PR
