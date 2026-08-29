@@ -3,6 +3,7 @@ import { MAX_CHAT_TEXT } from "../core/config.js";
 import { verifySignedPayload } from "../core/crypto.js";
 import { setting } from "../core/db.js";
 import { errorJson, json } from "../core/http.js";
+import { archiveChatMessage } from "./archive.js";
 
 export class GlobalChat extends DurableObject {
   constructor(ctx, env) {
@@ -74,6 +75,17 @@ export class GlobalChat extends DurableObject {
     const messages = (await this.ctx.storage.get("messages")) || [];
     messages.push(entry); if (messages.length > 100) messages.splice(0, messages.length - 100);
     await this.ctx.storage.put("messages", messages);
+    if (this.env.BOARDVERSE_DB) {
+      await archiveChatMessage(this.env.BOARDVERSE_DB, {
+        id: entry.id,
+        channel: "global",
+        senderKind: entry.senderKind,
+        senderId: entry.senderId,
+        senderName: entry.name,
+        text: entry.text,
+        createdAt: entry.at,
+      }).catch(() => {});
+    }
     a.lastAt = now; a.recent = [...recent, { at: now, text }]; ws.serializeAttachment(a);
     this.broadcast({ type: "global_chat", message: entry });
   }
