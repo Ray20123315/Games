@@ -1,0 +1,46 @@
+name: Inspect v0.0.26 Seven Kingdoms architecture
+on:
+  push:
+    branches: [feature/qiguo-xiangqi-v0.0.26]
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Build v0.0.25
+        working-directory: BoardVerse
+        run: |
+          node build-worker.mjs
+          for v in 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025; do node post-build-v${v}.mjs; done
+          node --check worker.js
+      - name: Inspect architecture
+        working-directory: BoardVerse
+        run: |
+          node --input-type=module <<'NODE'
+          import {readFile} from 'node:fs/promises';
+          const s=await readFile('worker.js','utf8');
+          function block(marker){
+            const a=s.indexOf(marker); if(a<0){console.log('MISSING',marker); return;}
+            const o=s.indexOf('{',a); let d=0,q='',esc=false,line=false,com=false;
+            for(let i=o;i<s.length;i++){
+              const c=s[i],n=s[i+1];
+              if(line){if(c==='\n')line=false;continue} if(com){if(c==='*'&&n==='/'){com=false;i++}continue}
+              if(q){if(esc){esc=false;continue} if(c==='\\'){esc=true;continue} if(c===q)q='';continue}
+              if(c==='/'&&n==='/'){line=true;i++;continue} if(c==='/'&&n==='*'){com=true;i++;continue}
+              if(c==='"'||c==="'"||c==='`'){q=c;continue} if(c==='{')d++; else if(c==='}'&&--d===0){console.log('\n--- '+marker+' ---\n'+s.slice(a,i+1)); return}
+            }
+          }
+          for(const m of [
+            'function seatMember(', 'function roomMemberById(', 'function publicMemberForRoom(',
+            'function roomView(', 'function sanitizeLobbyRecord(', 'function renderGameCatalog()',
+            'function renderRoom(', 'function renderBoard(', 'function renderPlayers(',
+            'async maybeStartMatch(', 'async takeSeat(', 'async handleMove(', 'async finishMatch(',
+            'async resign(', 'lobbyRecord()', 'async createRoom(', 'async joinRoom('
+          ]) block(m);
+          for(const needle of ['seats: [','seats:[','room.seats.length','this.room.seats.length','=== 2','< 2','seat === 0','seat===0']){
+            console.log('\n=== OCCURRENCES '+needle+' ==='); let p=0,c=0; while((p=s.indexOf(needle,p))>=0&&c<20){console.log(s.slice(Math.max(0,p-180),Math.min(s.length,p+260)).replace(/\n/g,' '));p+=needle.length;c++}
+          }
+          NODE
