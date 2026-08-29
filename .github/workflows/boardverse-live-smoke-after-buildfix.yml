@@ -1,0 +1,44 @@
+name: BoardVerse live smoke after Cloudflare build fix
+
+on:
+  push:
+    branches: [boardverse-live-smoke-after-buildfix-v011]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify live production surfaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://xn--gmqt6w03b11v.ray2025.com'
+          tmp="$(mktemp -d)"
+          nonce="$(date +%s)"
+
+          health_code=$(curl --retry 4 --retry-delay 2 -sS -o "$tmp/health.json" -w '%{http_code}' "$BASE/health?smoke=$nonce")
+          echo "HEALTH=$health_code $(cat "$tmp/health.json")"
+          test "$health_code" = 200
+          grep -q '"version":"0.1.1"' "$tmp/health.json"
+
+          home_code=$(curl --retry 4 --retry-delay 2 -sS -o "$tmp/home.html" -w '%{http_code}' "$BASE/?smoke=$nonce")
+          echo "HOME=$home_code"
+          test "$home_code" = 200
+          grep -q 'id="bvPublicNav"' "$tmp/home.html"
+          grep -q 'v0.1.1' "$tmp/home.html"
+
+          admin_code=$(curl --retry 4 --retry-delay 2 -sS -D "$tmp/admin.headers" -o /dev/null -w '%{http_code}' "$BASE/admin?smoke=$nonce")
+          echo "ADMIN=$admin_code"
+          test "$admin_code" = 302
+          grep -qi '^location: .*\/admin/' "$tmp/admin.headers"
+
+          for path in admin/ report register login; do
+            code=$(curl --retry 4 --retry-delay 2 -sS -o "$tmp/${path//\//_}.body" -w '%{http_code}' "$BASE/$path?smoke=$nonce")
+            echo "${path^^}=$code"
+            test "$code" != 404
+            test "$code" -ge 200
+            test "$code" -lt 400
+          done
+
+          echo 'LIVE_SURFACES=PASS'
