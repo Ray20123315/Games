@@ -23,6 +23,6 @@ test("OWNER account HTML masks the synthetic admin bridge email", () => {
   assert.match(source, /內部管理帳號/);
 });
 
-test("deployment entry points at v015 compatibility layer", () => {
-  assert.match(wrangler, /"main": "src\/index-v015\.js"/);
+test("deployment entry points at v016 compatibility layer", () => {
+  assert.match(wrangler, /"main": "src\/index-v016\.js"/);
 });
