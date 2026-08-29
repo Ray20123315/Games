@@ -1,6 +1,7 @@
 # BoardVerse host-kick task
 
-Canonical entry: `ACTIVE_TASK.md`.
+State: CLEAN.
 
-State: DIRTY — implementation committed to the task branch is pending remote diff/build verification.
-Unique next action: verify the branch commit, run available checks, then consolidate memory to CLEAN.
+Authoritative code: `main` at `a57b6596afc50ba53e81fb6e9625597f9c8098a2` (merged PR #30).
+Canonical execution record: `ACTIVE_TASK.md`.
+Next action: none; task completed. Future work should re-read current `main` before making changes.

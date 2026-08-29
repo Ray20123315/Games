@@ -1,8 +1,11 @@
 {
-  "state": "DIRTY",
+  "state": "CLEAN",
   "task": "host-kick-any-phase",
   "revision": 1,
-  "baseline_sha": "2cbbb9213986b275861f371feb97b5bfef5eeaee",
-  "branch": "fix/host-kick-any-phase-v3",
-  "next_action": "verify remote branch and open PR"
+  "task_status": "completed",
+  "delivery_pr": 30,
+  "authoritative_branch": "main",
+  "authoritative_sha": "a57b6596afc50ba53e81fb6e9625597f9c8098a2",
+  "verified_pr_head": "cf69d22743e9e0818b514f8f45859d4ef6aca8be",
+  "next_action": null
 }

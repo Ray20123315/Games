@@ -8,6 +8,8 @@ import { createUserSession, revokeAllUserSessions } from "./sessions.js";
 function usernameDisplay(v) { return String(v || "").normalize("NFKC").trim().slice(0, 24); }
 function usernameKey(v) { return usernameDisplay(v).toLocaleLowerCase("en-US"); }
 function emailKey(v) { return String(v || "").normalize("NFKC").trim().toLocaleLowerCase("en-US").slice(0, 254); }
+function adminUsernameKey(env) { return usernameKey(env?.ADMIN_USERNAME || ""); }
+function isInternalAdminEmail(v) { return String(v || "").toLocaleLowerCase("en-US").endsWith("@boardverse.invalid"); }
 function validateUsername(v) { return /^[\p{L}\p{N}_.-]{3,24}$/u.test(v); }
 function validateEmail(v) { return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
 function validatePassword(v) { return typeof v === "string" && v.length >= 10 && v.length <= 128; }
@@ -32,6 +34,7 @@ async function createEmailToken(db, userId, type, ttlMs) {
 export async function registerUser(db, env, request, input, baseUrl) {
   const username = usernameDisplay(input.username), normalized = usernameKey(username), email = emailKey(input.email), password = String(input.password || "");
   if (!validateUsername(username)) throw new HttpError(400, "username_invalid", "Username 需為 3～24 個字元，可使用文字、數字、_ . -。 ");
+  if (normalized && normalized === adminUsernameKey(env)) throw new HttpError(409, "account_exists", "此 Username 已保留給管理員帳號。");
   if (!validateEmail(email)) throw new HttpError(400, "email_invalid", "Email 格式不正確。");
   if (!validatePassword(password)) throw new HttpError(400, "password_invalid", "密碼需為 10～128 個字元。");
   const existing = await first(db, "SELECT id FROM users WHERE username_normalized=? OR email_normalized=? LIMIT 1", normalized, email);
@@ -55,9 +58,9 @@ export async function sendVerification(db, env, request, userId, email, baseUrl)
 
 export async function resendVerification(db, env, request, identifier, baseUrl) {
   const key = String(identifier || "").normalize("NFKC").trim().toLocaleLowerCase("en-US");
-  if (!key) return { accepted: true };
+  if (!key || key === adminUsernameKey(env)) return { accepted: true };
   const user = await first(db, "SELECT id,email_normalized,email_verified_at FROM users WHERE username_normalized=? OR email_normalized=? LIMIT 1", key, key);
-  if (!user || user.email_verified_at) return { accepted: true };
+  if (!user || user.email_verified_at || isInternalAdminEmail(user.email_normalized)) return { accepted: true };
   await sendVerification(db, env, request, user.id, user.email_normalized, baseUrl);
   return { accepted: true };
 }
@@ -88,8 +91,9 @@ export async function loginUser(db, identifier, password) {
 
 export async function requestPasswordReset(db, env, request, identifier, baseUrl) {
   const key = String(identifier || "").normalize("NFKC").trim().toLocaleLowerCase("en-US");
+  if (key && key === adminUsernameKey(env)) return { accepted: true };
   const user = await first(db, "SELECT id,email_normalized FROM users WHERE username_normalized=? OR email_normalized=? LIMIT 1", key, key);
-  if (!user) return { accepted: true };
+  if (!user || isInternalAdminEmail(user.email_normalized)) return { accepted: true };
   const ipHash = await sha256Hex(clientIp(request));
   await emailRateGuard(db, `reset:${user.email_normalized}`, "reset", 60_000, 5);
   await emailRateGuard(db, `reset-ip:${ipHash}`, "reset", 30_000, 15);

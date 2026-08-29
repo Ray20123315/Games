@@ -1,12 +1,10 @@
-import app, {
-  BoardVerseDb as AppBoardVerseDb,
-  GameRoom as AppGameRoom,
-  GlobalChat as AppGlobalChat,
-} from "./index-v011.js";
+import appV011, { GameRoom as GameRoomBase } from "./index-v011.js";
 import { appendEvent, ensureFeatureState, requireRevision, resetReady } from "./room/state.js";
 import { assertOwner } from "./room/roles.js";
 import { cancelDeadline } from "./room/deadline-scheduler.js";
 import { parseWsMessage } from "./protocol/messages.js";
+
+export { BoardVerseDb, BoardVerseDbV011, GameRoomV011, GlobalChat, GlobalChatV011 } from "./index-v011.js";
 
 function memberById(room, id) {
   return room?.members?.find((member) => member.id === id) || null;
@@ -27,16 +25,15 @@ function publicMember(room, member) {
 const HOST_KICK_SCRIPT = String.raw`<script id="boardverse-host-kick">
 (function(){
 'use strict';
-var feature=null,panel=null,list=null;
+var feature=null;
 function lang(){try{return localStorage.getItem('boardverseLang')||'zh-Hant'}catch(e){return 'zh-Hant'}}
 function text(h,s,e){return lang()==='en'?e:lang()==='zh-Hans'?s:h}
-function roleLabel(m){if(m.seated)return text('玩家','玩家','Player');if(m.role==='queued')return text('排隊','排队','Queued');if(m.role==='pending')return text('待核准','待批准','Pending');return text('觀戰','观战','Spectator')}
-function ensurePanel(){if(panel&&document.body.contains(panel))return panel;var players=document.getElementById('players');if(!players)return null;panel=document.createElement('section');panel.id='bvHostKickPanel';panel.className='card hidden';panel.style.marginTop='12px';var title=document.createElement('div');title.style.cssText='font-weight:900;margin-bottom:8px';title.textContent=text('房主成員管理','房主成员管理','Host member controls');list=document.createElement('div');list.id='bvHostKickList';list.style.cssText='display:grid;gap:8px';panel.appendChild(title);panel.appendChild(list);players.insertAdjacentElement('afterend',panel);return panel}
-function confirmKick(m){var phase=feature&&feature.status==='playing'?text('若此人正在對局，本局會以無結果終止。','若此人正在对局，本局会以无结果终止。','If this member is in the active game, the game will end with no result.'):'',q=text('確定要把「','确定要把“','Remove “')+m.name+text('」踢出房間嗎？','”踢出房间吗？','” from the room?');return window.confirm(q+(phase?'\n\n'+phase:''))}
-function render(){var p=ensurePanel();if(!p)return;if(!feature||!feature.isOwner){p.classList.add('hidden');if(list)list.textContent='';return}p.classList.remove('hidden');list.textContent='';var members=Array.isArray(feature.kickableMembers)?feature.kickableMembers:[];if(!members.length){var empty=document.createElement('div');empty.className='small muted';empty.textContent=text('目前沒有可踢出的其他成員。','目前没有可踢出的其他成员。','There are no other members to remove.');list.appendChild(empty);return}members.forEach(function(m){var row=document.createElement('div');row.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;border:1px solid var(--line);border-radius:10px';var meta=document.createElement('div');var name=document.createElement('strong');name.textContent=m.name;var sub=document.createElement('div');sub.className='small muted';sub.textContent=roleLabel(m)+' · '+(m.connected?text('在線','在线','Online'):text('離線','离线','Offline'));meta.appendChild(name);meta.appendChild(sub);var kick=document.createElement('button');kick.type='button';kick.className='btn danger';kick.textContent=text('踢出','踢出','Kick');kick.addEventListener('click',function(){if(!feature||!confirmKick(m))return;var bridge=window.BoardVerseBridge;if(!bridge||typeof bridge.send!=='function')return;kick.disabled=true;bridge.send({type:'kick_member',memberId:m.id,revision:feature.revision});setTimeout(function(){kick.disabled=false},1200)});row.appendChild(meta);row.appendChild(kick);list.appendChild(row)})}
-window.addEventListener('boardverse:feature',function(e){feature=e.detail;render()});
-window.addEventListener('boardverse:language',render);
-setTimeout(function(){try{feature=window.BoardVerseBridge&&window.BoardVerseBridge.feature();render()}catch(e){}},0);
+function ensurePanel(){var players=document.getElementById('players');if(!players)return null;var panel=document.getElementById('bvHostKickPanel');if(panel)return panel;panel=document.createElement('section');panel.id='bvHostKickPanel';panel.className='setup hidden';panel.style.marginTop='12px';players.parentNode.insertBefore(panel,players.nextSibling);return panel}
+function roleText(m){if(m.seated)return text('玩家','玩家','Player');if(m.role==='queued')return text('排隊','排队','Queued');if(m.role==='pending')return text('待審核','待审核','Pending');return text('觀眾','观众','Spectator')}
+function sync(next){feature=next||feature;var panel=ensurePanel();if(!panel)return;var members=feature&&feature.isOwner&&Array.isArray(feature.kickableMembers)?feature.kickableMembers:[];if(!feature||!feature.isOwner){panel.classList.add('hidden');panel.textContent='';return}panel.classList.remove('hidden');panel.textContent='';var title=document.createElement('strong');title.textContent=text('房主管理','房主管理','Host controls');panel.appendChild(title);var hint=document.createElement('div');hint.className='small muted';hint.style.margin='6px 0 10px';hint.textContent=text('可在遊戲開始前、進行中或結束後踢出成員。進行中踢出在席玩家會將該局以無結果終止。','可在游戏开始前、进行中或结束后踢出成员。进行中踢出在席玩家会将该局以无结果终止。','Members can be kicked before, during, or after a game. Kicking a seated player during play ends that game with no result.');panel.appendChild(hint);if(!members.length){var empty=document.createElement('div');empty.className='small muted';empty.textContent=text('目前沒有可踢出的其他成員。','目前没有可踢出的其他成员。','There are no other members to remove.');panel.appendChild(empty);return}members.forEach(function(m){var row=document.createElement('div');row.className='queue-row';row.style.display='flex';row.style.alignItems='center';row.style.justifyContent='space-between';row.style.gap='10px';var label=document.createElement('span');label.textContent=m.name+' · '+roleText(m)+' · '+(m.connected?text('在線','在线','online'):text('離線','离线','offline'));var button=document.createElement('button');button.type='button';button.className='btn ghost';button.textContent=text('踢出','踢出','Kick');button.addEventListener('click',function(){if(!feature)return;var phase=feature.status==='playing'&&m.seated?'\n\n'+text('此玩家正在對局，本局會以無結果終止。','此玩家正在对局，本局会以无结果终止。','This player is in the active game; the game will end with no result.'):'';var confirmText=text('確定要將「'+m.name+'」踢出房間嗎？','确定要将“'+m.name+'”踢出房间吗？','Kick “'+m.name+'” from the room?')+phase;if(!window.confirm(confirmText))return;var bridge=window.BoardVerseBridge;if(!bridge||typeof bridge.send!=='function')return;button.disabled=true;var sent=bridge.send({type:'host_kick',memberId:m.id,revision:feature.revision});if(!sent){button.disabled=false;window.alert(text('目前無法送出踢人指令。','目前无法送出踢人指令。','Unable to send the kick command right now.'));return}setTimeout(function(){button.disabled=false},1200)});row.appendChild(label);row.appendChild(button);panel.appendChild(row)})}
+window.addEventListener('boardverse:feature',function(e){sync(e.detail)});
+window.addEventListener('boardverse:language',function(){sync(feature)});
+setTimeout(function(){try{sync(window.BoardVerseBridge&&window.BoardVerseBridge.feature())}catch(e){}},0);
 })();
 </script>`;
 
@@ -46,10 +43,7 @@ function injectHostKickScript(source) {
   return source + HOST_KICK_SCRIPT;
 }
 
-export class BoardVerseDb extends AppBoardVerseDb {}
-export class BoardVerseDbV012 extends BoardVerseDb {}
-
-export class GameRoom extends AppGameRoom {
+export class GameRoom extends GameRoomBase {
   send(ws, message) {
     let next = message;
     if (message?.type === "feature_state" && message.feature && this.room) {
@@ -57,7 +51,6 @@ export class GameRoom extends AppGameRoom {
       const viewer = this.room.members?.find((member) => member.token === token) || null;
       const isOwner = !!viewer && viewer.id === this.room.ownerId;
       const feature = { ...message.feature };
-      feature.canKickMembers = isOwner;
       feature.kickableMembers = isOwner
         ? (this.room.members || []).filter((member) => member.id !== this.room.ownerId).map((member) => publicMember(this.room, member))
         : [];
@@ -67,9 +60,9 @@ export class GameRoom extends AppGameRoom {
   }
 
   async webSocketMessage(ws, message) {
-    let msg = null;
+    let msg;
     try { msg = parseWsMessage(message); } catch { return super.webSocketMessage(ws, message); }
-    if (msg.type !== "kick_member") return super.webSocketMessage(ws, message);
+    if (msg.type !== "host_kick") return super.webSocketMessage(ws, message);
 
     await this.loadRoom();
     if (!this.room) return;
@@ -81,11 +74,11 @@ export class GameRoom extends AppGameRoom {
     }
 
     try {
-      await this.kickMember(auth.member, msg);
+      await this.hostKickMember(auth.member, msg);
     } catch (error) {
       this.send(ws, {
         type: "error",
-        code: error?.code || "kick_failed",
+        code: error?.code || "host_kick_failed",
         expectedRevision: error?.expectedRevision,
         message: error?.message || "踢出成員失敗。",
       });
@@ -93,7 +86,7 @@ export class GameRoom extends AppGameRoom {
     }
   }
 
-  async kickMember(owner, msg) {
+  async hostKickMember(owner, msg) {
     const room = this.room;
     if (!room) throw new Error("找不到此房間。");
     const bv = ensureFeatureState(room);
@@ -101,8 +94,16 @@ export class GameRoom extends AppGameRoom {
     assertOwner(room, owner);
 
     const target = memberById(room, String(msg.memberId || ""));
-    if (!target) throw new Error("找不到要踢出的成員。");
-    if (target.id === room.ownerId) throw new Error("房主不能踢出自己。");
+    if (!target) {
+      const error = new Error("找不到要踢出的房間成員。");
+      error.code = "member_not_found";
+      throw error;
+    }
+    if (target.id === room.ownerId) {
+      const error = new Error("房主不能踢出自己。");
+      error.code = "invalid_kick_target";
+      throw error;
+    }
 
     const targetSnapshot = publicMember(room, target);
     const previousStatus = room.status;
@@ -165,7 +166,7 @@ export class GameRoom extends AppGameRoom {
       resetReady(room, false);
     }
 
-    appendEvent(room, "player_kicked", {
+    appendEvent(room, "member_kicked", {
       memberId: owner.id,
       name: owner.name,
       side: owner.side || null,
@@ -202,14 +203,12 @@ export class GameRoom extends AppGameRoom {
     }
   }
 }
-export class GameRoomV012 extends GameRoom {}
 
-export class GlobalChat extends AppGlobalChat {}
-export class GlobalChatV012 extends GlobalChat {}
+export class GameRoomV012 extends GameRoom {}
 
 export default {
   async fetch(request, env, ctx) {
-    const response = await app.fetch(request, env, ctx);
+    const response = await appV011.fetch(request, env, ctx);
     const type = response.headers.get("content-type") || "";
     if (!type.includes("text/html")) return response;
     const body = injectHostKickScript(await response.text());
@@ -218,6 +217,6 @@ export default {
     return new Response(body, { status: response.status, statusText: response.statusText, headers });
   },
   scheduled(event, env, ctx) {
-    return app.scheduled(event, env, ctx);
+    return appV011.scheduled(event, env, ctx);
   },
 };

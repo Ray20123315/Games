@@ -2,6 +2,13 @@ import { ADMIN_COOKIE, ADMIN_PLAYER_COOKIE, ADMIN_SESSION_MS } from "../core/con
 import { constantTimeEqual, randomToken, sha256Hex, signPayload, verifySignedPayload } from "../core/crypto.js";
 import { first, run } from "../core/db.js";
 import { cookie, parseCookies, clientIp, HttpError } from "../core/http.js";
+import { createUserSession } from "../auth/sessions.js";
+
+function adminCredentialsMatch(env, username, password) {
+  if (!env?.ADMIN_USERNAME || !env?.ADMIN_PASSWORD) return false;
+  return constantTimeEqual(String(username || ""), String(env.ADMIN_USERNAME))
+    && constantTimeEqual(String(password || ""), String(env.ADMIN_PASSWORD));
+}
 
 export async function adminLogin(db, env, request, username, password) {
   if (!env?.ADMIN_USERNAME || !env?.ADMIN_PASSWORD || !env?.ADMIN_SESSION_SECRET) throw new HttpError(503, "admin_unconfigured", "管理員 Secrets 尚未完整設定。");
@@ -9,7 +16,7 @@ export async function adminLogin(db, env, request, username, password) {
   const now = Date.now(), windowStart = now - 15 * 60_000;
   const old = await first(db, "SELECT window_start,failure_count,blocked_until FROM admin_login_attempts WHERE ip_hash=?", ipHash);
   if (Number(old?.blocked_until || 0) > now) throw new HttpError(429, "admin_locked", "登入嘗試過多，請稍後再試。");
-  const valid = constantTimeEqual(String(username || ""), String(env.ADMIN_USERNAME)) && constantTimeEqual(String(password || ""), String(env.ADMIN_PASSWORD));
+  const valid = adminCredentialsMatch(env, username, password);
   if (!valid) {
     let count = Number(old?.failure_count || 0), start = Number(old?.window_start || now);
     if (start < windowStart) { count = 0; start = now; }
@@ -23,6 +30,38 @@ export async function adminLogin(db, env, request, username, password) {
   const payload = { iat: now, exp: now + ADMIN_SESSION_MS, nonce: randomToken(18), user: String(env.ADMIN_USERNAME) };
   const token = await signPayload(env.ADMIN_SESSION_SECRET, payload);
   return { payload, setCookie: cookie(ADMIN_COOKIE, token, { maxAge: ADMIN_SESSION_MS / 1000, path: "/admin", sameSite: "Strict" }) };
+}
+
+export async function adminUserLogin(db, env, identifier, password) {
+  if (!adminCredentialsMatch(env, identifier, password)) return null;
+  const display = String(env.ADMIN_USERNAME || "").normalize("NFKC").trim().slice(0, 24);
+  const normalized = display.toLocaleLowerCase("en-US");
+  if (!normalized) return null;
+
+  let user = await first(db, "SELECT * FROM users WHERE username_normalized=? LIMIT 1", normalized);
+  const now = Date.now();
+  if (!user) {
+    const id = crypto.randomUUID();
+    const email = `admin-${id.toLocaleLowerCase("en-US")}@boardverse.invalid`;
+    await run(db, `INSERT INTO users(id,username_normalized,username_display,email_normalized,email_verified_at,password_algorithm,password_iterations,password_salt,password_hash,status,suspended_until,gp,level,reputation,unlimited_custom_room_id,custom_room_suspended_until,created_at,updated_at)
+      VALUES(?,?,?,?,?,'ADMIN_SECRET',0,NULL,NULL,'active',NULL,0,1,100,0,NULL,?,?)
+      ON CONFLICT(username_normalized) DO NOTHING`, id, normalized, display, email, now, now, now);
+    user = await first(db, "SELECT * FROM users WHERE username_normalized=? LIMIT 1", normalized);
+  }
+  if (!user) throw new HttpError(500, "admin_user_profile_failed", "無法建立管理員的使用者身分。");
+  if (user.status === "suspended" && Number(user.suspended_until || 0) <= now) {
+    await run(db, "UPDATE users SET status='active',suspended_until=NULL,updated_at=? WHERE id=?", now, user.id);
+    user.status = "active";
+    user.suspended_until = null;
+  }
+  if (user.status !== "active" || (user.suspended_until && Number(user.suspended_until) > now)) {
+    throw new HttpError(401, "login_failed", "帳號或密碼錯誤，或帳號目前無法登入。");
+  }
+  if (!user.email_verified_at) {
+    await run(db, "UPDATE users SET email_verified_at=?,updated_at=? WHERE id=?", now, now, user.id);
+    user.email_verified_at = now;
+  }
+  return { user, session: await createUserSession(db, user.id), adminBridged: true };
 }
 
 export async function requireAdmin(env, request) {

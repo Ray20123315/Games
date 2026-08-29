@@ -9,7 +9,7 @@ function scripts(source) {
 }
 
 assert.match(HOME_SHELL_SCRIPT, /id="boardverse-safe-home"/);
-assert.match(HOME_SHELL_SCRIPT, /id="bvSafeHome"/);
+assert.match(HOME_SHELL_SCRIPT, /root\.id='bvSafeHome'/);
 assert.match(HOME_SHELL_SCRIPT, /u\.pathname==='\/'/);
 assert.match(HOME_SHELL_SCRIPT, /searchParams\.get\('play'\)!=='1'/);
 assert.match(HOME_SHELL_SCRIPT, /href="\/\?play=1"/);

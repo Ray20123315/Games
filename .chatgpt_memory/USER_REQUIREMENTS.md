@@ -1,5 +1,5 @@
 # USER_REQUIREMENTS
 
-- Room owner must be able to kick members before, during, and after a game.
-- Preserve existing project structure/behavior outside this feature.
-- Do not claim unverified deployment or test success.
+- Room owner can kick members before, during, and after a game.
+- Preserve existing project structure, historical exports, and unrelated behavior.
+- Do not claim tests, deployment, merge, or verification that did not actually occur.
