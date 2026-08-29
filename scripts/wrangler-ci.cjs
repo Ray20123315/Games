@@ -8,6 +8,7 @@ const path = require('node:path');
 
 const REAL_WRANGLER = 'wrangler@4.127.1';
 const branch = process.env.WORKERS_CI_BRANCH || '';
+const commitSha = process.env.WORKERS_CI_COMMIT_SHA || '';
 const isWorkersBuild = process.env.WORKERS_CI === '1';
 const isProduction = isWorkersBuild && branch === 'main';
 
@@ -110,10 +111,16 @@ function productionConfig(databaseId) {
     process.exit(runReal(['versions', 'upload', '--config', 'wrangler.preview.jsonc']));
   }
 
+  if (!commitSha) throw new Error('WORKERS_CI_COMMIT_SHA is required for an atomic production promotion.');
   const configPath = productionConfig(db?.database_id || null);
+  const versionTag = `boardverse-${commitSha.slice(0, 16)}`;
+  const message = `BoardVerse v0.1.1 ${commitSha.slice(0, 12)}`;
   console.log(`[boardverse-ci] production database backend: ${db?.database_id ? 'D1 + existing GameRoom fallback' : 'existing GameRoom SQLite fallback'}`);
-  console.log('[boardverse-ci] deploying BoardVerse v0.1.1 to production Worker games');
-  process.exit(runReal(['deploy', '--config', configPath]));
+  console.log(`[boardverse-ci] uploading full production version with tag ${versionTag}`);
+  const uploadStatus = runReal(['versions', 'upload', '--config', configPath, '--tag', versionTag, '--message', message]);
+  if (uploadStatus !== 0) process.exit(uploadStatus);
+  console.log(`[boardverse-ci] promoting ${versionTag} to 100% production traffic`);
+  process.exit(runReal(['versions', 'deploy', '--config', configPath, '--version-tag', versionTag, '-y', '--message', message]));
 })().catch((error) => {
   console.error(`[boardverse-ci] ${error.stack || error.message}`);
   process.exit(1);
