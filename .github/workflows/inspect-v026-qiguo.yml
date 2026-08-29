@@ -22,6 +22,7 @@ jobs:
           node --input-type=module <<'NODE'
           import {readFile} from 'node:fs/promises';
           const s=await readFile('worker.js','utf8');
+          function around(marker,n=1800){const a=s.indexOf(marker);console.log('\n### '+marker+' @ '+a+' ###');if(a>=0)console.log(s.slice(Math.max(0,a-n),Math.min(s.length,a+n)))}
           function block(marker){
             const a=s.indexOf(marker); if(a<0){console.log('MISSING',marker); return;}
             const o=s.indexOf('{',a); let d=0,q='',esc=false,line=false,com=false;
@@ -34,13 +35,11 @@ jobs:
             }
           }
           for(const m of [
-            'function seatMember(', 'function roomMemberById(', 'function publicMemberForRoom(',
-            'function roomView(', 'function sanitizeLobbyRecord(', 'function renderGameCatalog()',
-            'function renderRoom(', 'function renderBoard(', 'function renderPlayers(',
-            'async maybeStartMatch(', 'async takeSeat(', 'async handleMove(', 'async finishMatch(',
-            'async resign(', 'lobbyRecord()', 'async createRoom(', 'async joinRoom('
-          ]) block(m);
-          for(const needle of ['seats: [','seats:[','room.seats.length','this.room.seats.length','=== 2','< 2','seat === 0','seat===0']){
-            console.log('\n=== OCCURRENCES '+needle+' ==='); let p=0,c=0; while((p=s.indexOf(needle,p))>=0&&c<20){console.log(s.slice(Math.max(0,p-180),Math.min(s.length,p+260)).replace(/\n/g,' '));p+=needle.length;c++}
-          }
+            'maybeStartMatch()', 'takeSeat(', 'async join(', 'async create(', 'async initialize(', 'repairRoom(',
+            'roomView(', 'lobbyRecord()', 'roomInfo()', 'handleMove(', 'resign(', 'renderGameBoard(', 'renderGameBoard=function',
+            'function renderGameBoard(', 'function renderStatus(', 'function sideName(', 'function newGame(', 'function applyGameAction('
+          ]) around(m);
+          const ca=s.indexOf('class GameRoom');
+          if(ca>=0){const cb=s.indexOf('export default',ca)>ca?s.indexOf('export default',ca):Math.min(s.length,ca+50000);const cls=s.slice(ca,cb);console.log('\n=== GameRoom method-like lines ===');for(const line of cls.split('\n'))if(/^\s{2}(?:async\s+)?[A-Za-z_$][\w$]*\([^)]*\)\s*\{/.test(line))console.log(line.trim())}
+          for(const m of ['function renderGameBoard(', 'function renderStatus(', 'function sideName(', 'function newGame(', 'function applyGameAction(']) block(m);
           NODE
