@@ -3,6 +3,7 @@ import { APP_VERSION } from "./core/config.js";
 import { withDatabaseEnv } from "./core/db.js";
 import { BoardVerseDb as AppBoardVerseDb } from "./db/BoardVerseDb.js";
 import { hardenPieceThemeHtml } from "./ui/piece-theme.js";
+import { SITE_I18N_SCRIPT } from "./ui/site-i18n.js";
 
 // Keep historical Durable Object class exports alive. Cloudflare already has a
 // live SQLite namespace for GameRoom, so production reuses that namespace
@@ -49,8 +50,14 @@ export class GlobalChatV011 extends GlobalChat {}
 
 function injectPublicNav(source, pathname) {
   if (pathname !== "/" || source.includes('id="bvPublicNav"')) return source;
-  const nav = `<nav id="bvPublicNav" aria-label="BoardVerse 功能入口" style="position:fixed;z-index:9999;top:12px;right:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 10px;border:1px solid rgba(127,127,127,.35);border-radius:12px;background:rgba(18,20,26,.92);backdrop-filter:blur(10px);box-shadow:0 8px 28px rgba(0,0,0,.25);font:600 14px/1.2 system-ui,sans-serif"><span style="opacity:.72;margin-right:2px">v${APP_VERSION}</span><a href="/login" style="color:#fff;text-decoration:none;padding:6px 8px">登入</a><a href="/register" style="color:#fff;text-decoration:none;padding:6px 8px">註冊</a><a href="/report" style="color:#fff;text-decoration:none;padding:6px 8px">回報</a><a href="/admin" style="color:#fff;text-decoration:none;padding:6px 8px">管理</a></nav>`;
+  const nav = `<nav id="bvPublicNav" aria-label="BoardVerse" style="position:fixed;z-index:9999;top:12px;right:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:9px 10px;border:1px solid rgba(127,127,127,.35);border-radius:12px;background:rgba(18,20,26,.92);backdrop-filter:blur(10px);box-shadow:0 8px 28px rgba(0,0,0,.25);font:600 14px/1.2 system-ui,sans-serif"><span style="opacity:.72;margin-right:2px">v${APP_VERSION}</span><a href="/login" style="color:#fff;text-decoration:none;padding:6px 8px">登入</a><a href="/register" style="color:#fff;text-decoration:none;padding:6px 8px">註冊</a><a href="/report" style="color:#fff;text-decoration:none;padding:6px 8px">回報</a><a href="/admin" style="color:#fff;text-decoration:none;padding:6px 8px">管理</a></nav>`;
   return source.replace(/<body([^>]*)>/i, (match) => `${match}${nav}`);
+}
+
+function injectSiteI18n(source) {
+  if (source.includes('id="boardverse-site-i18n"')) return source;
+  if (/<\/head>/i.test(source)) return source.replace(/<\/head>/i, `${SITE_I18N_SCRIPT}</head>`);
+  return SITE_I18N_SCRIPT + source;
 }
 
 export default {
@@ -63,7 +70,8 @@ export default {
     const response = await app.fetch(request, effectiveEnv, ctx);
     const type = response.headers.get("content-type") || "";
     if (!type.includes("text/html")) return response;
-    const body = hardenPieceThemeHtml(injectPublicNav(await response.text(), requestUrl.pathname));
+    const localized = injectSiteI18n(injectPublicNav(await response.text(), requestUrl.pathname));
+    const body = hardenPieceThemeHtml(localized);
     const headers = new Headers(response.headers);
     headers.delete("content-length");
     return new Response(body, { status: response.status, statusText: response.statusText, headers });
