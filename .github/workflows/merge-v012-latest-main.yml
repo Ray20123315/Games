@@ -64,7 +64,7 @@ jobs:
           WPID=$!
           trap 'kill $WPID 2>/dev/null || true' EXIT
           for i in $(seq 1 50); do curl -fsS http://127.0.0.1:8787/ >/dev/null 2>&1 && break; sleep 1; done
-          cat >/tmp/fresh-v012.mjs <<'EOF'
+          cat >.fresh-v012-temp.mjs <<'EOF'
           import puppeteer from 'puppeteer-core';
           const browser=await puppeteer.launch({executablePath:process.env.CHROME,args:['--no-sandbox','--disable-setuid-sandbox'],headless:true});
           const page=await browser.newPage();
@@ -78,7 +78,8 @@ jobs:
           if(errors.some(x=>/MutationObserver|CONNECTING|syncMultiplayerGameOptions|ReferenceError|TypeError/.test(x)))process.exit(3);
           await browser.close();
           EOF
-          CHROME="$CHROME" node /tmp/fresh-v012.mjs
+          CHROME="$CHROME" node .fresh-v012-temp.mjs
+          rm -f .fresh-v012-temp.mjs
       - name: Commit verified merge
         run: |
           git status --short
