@@ -8,6 +8,7 @@ import { BoardVerseDb as AppBoardVerseDb } from "./db/BoardVerseDb.js";
 import { hardenPieceThemeHtml } from "./ui/piece-theme.js";
 import { SITE_I18N_SCRIPT } from "./ui/site-i18n.js";
 import { FEATURE_POLICY_SCRIPT } from "./ui/feature-policy.js";
+import { injectAdminLevelPanel } from "./admin/level-ui.js";
 
 // Keep historical Durable Object class exports alive. Cloudflare already has a
 // live SQLite namespace for GameRoom, so production reuses that namespace
@@ -141,7 +142,8 @@ export default {
     const response = await app.fetch(request, effectiveEnv, ctx);
     const type = response.headers.get("content-type") || "";
     if (!type.includes("text/html")) return response;
-    const localized = injectSiteScripts(injectPublicNav(await response.text(), requestUrl.pathname));
+    const withAdminLevel = injectAdminLevelPanel(await response.text(), requestUrl.pathname);
+    const localized = injectSiteScripts(injectPublicNav(withAdminLevel, requestUrl.pathname));
     const body = hardenPieceThemeHtml(localized);
     const headers = new Headers(response.headers);
     headers.delete("content-length");
