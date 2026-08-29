@@ -3,6 +3,8 @@ import { readFile } from "node:fs/promises";
 const wr=await readFile(new URL("../wrangler.jsonc",import.meta.url),"utf8");
 assert.match(wr,/"main"\s*:\s*"src\/index-v011\.js"/);
 assert.doesNotMatch(wr,/"build"\s*:/);
+assert.match(wr,/xn--gmqt6w03b11v\.ray2025\.com/);
+assert.match(wr,/"custom_domain"\s*:\s*true/);
 assert.match(wr,/BOARDVERSE_DB_DO/);
 assert.match(wr,/"BOARDVERSE_DB_DO"\s*,\s*"class_name"\s*:\s*"GameRoom"/);
 assert.match(wr,/"ROOMS"\s*,\s*"class_name"\s*:\s*"GameRoom"/);
