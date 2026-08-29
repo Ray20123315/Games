@@ -49,7 +49,10 @@ assert.doesNotMatch(normalHtml, /class="owner-badge"/);
 assert.match(normalHtml, /Lv\.1/);
 assert.match(normalHtml, /每日簽到/);
 
-for (const marker of ["OWNER", "ADMIN", "訪客", "Lv\\.\\d+", "bv-id-owner", "bvIdOwnerGlow", "bvIdOwnerShine", "/api/me"]) assert.match(IDENTITY_BADGE_SCRIPT, new RegExp(marker));
+for (const marker of ["OWNER", "ADMIN", "訪客", "bv-id-owner", "bvIdOwnerGlow", "bvIdOwnerShine", "/api/me"]) {
+  assert.ok(IDENTITY_BADGE_SCRIPT.includes(marker), `identity badge script missing ${marker}`);
+}
+assert.ok(IDENTITY_BADGE_SCRIPT.includes(String.raw`Lv\.\d+`), "member badge matcher must recognize Lv.N labels");
 assert.doesNotMatch(IDENTITY_BADGE_SCRIPT, /ADMIN_PASSWORD|ADMIN_USERNAME/);
 const scripts = [...IDENTITY_BADGE_SCRIPT.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
 assert.equal(scripts.length, 1);
