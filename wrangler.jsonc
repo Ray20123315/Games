@@ -2,22 +2,6 @@
   "name": "games",
   "main": "BoardVerse/src/index-v011.js",
   "compatibility_date": "2026-08-28",
-  "routes": [
-    {
-      "pattern": "xn--gmqt6w03b11v.ray2025.com",
-      "custom_domain": true
-    }
-  ],
-  "durable_objects": {
-    "bindings": [
-      { "name": "ROOMS", "class_name": "GameRoom" },
-      { "name": "GLOBAL_CHAT", "class_name": "GlobalChat" }
-    ]
-  },
-  "exports": {
-    "GameRoom": { "type": "durable-object", "storage": "sqlite" },
-    "GlobalChat": { "type": "durable-object", "storage": "sqlite" }
-  },
   "triggers": {
     "crons": ["0 16 * * *"]
   },
@@ -28,9 +12,4 @@
     "TURNSTILE_SITE_KEY": "0x4AAAAAAEgJg9Xf_BRP8k0b",
     "TURNSTILE_HOSTNAMES": "xn--gmqt6w03b11v.ray2025.com,多人棋室.ray2025.com"
   }
-
-  // Cloudflare Workers Builds is connected to Worker "games" and invokes
-  // Wrangler from the repository root. This root adapter mirrors the BoardVerse
-  // deployment shape while pointing main at BoardVerse/src/index-v011.js.
-  // BOARDVERSE_DB remains external until the real D1 UUID is configured.
 }
