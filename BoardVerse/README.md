@@ -6,7 +6,7 @@ BoardVerse v0.1.1 是以 Cloudflare Worker、SQLite-backed Durable Objects 與 H
 
 `src/` 是唯一權威產品來源，Wrangler 正式入口固定為 `src/index-v011.js`。舊版 gzip/Base64 source chunks、`post-build-v*.mjs` 與 `sim-v*.mjs` deterministic patch chain 不再參與正式建置。
 
-`build-worker.mjs` 現在只是一個 **Cloudflare Workers Builds 驗證 gate**：先跑完整 `npm test`，再執行 `wrangler deploy --dry-run`。它不再生成或 patch 正式 Worker 原始碼；驗證成功後，Cloudflare 既有 Deploy command `npx wrangler deploy` 才會真正部署 `src/index-v011.js`。
+`build-worker.mjs` 是 Cloudflare Workers Builds 的驗證與 production handoff gate：先跑完整 `npm test`，再執行 `wrangler deploy --dry-run`。非 production branch 到此停止，不會觸碰正式 Worker；`main` build 驗證通過後，會移除 Workers Builds 注入的 `WRANGLER_CI_OVERRIDE_NAME`，再顯式執行一次 `wrangler deploy --config wrangler.jsonc`，讓 Wrangler 依 repository config 更新目前實際承接正式 hostname 的 `crimson-haze-0a4d`。
 
 為避免重構時改壞既有遊戲規則與 UI 行為，v0.0.29 的最終生成結果以可讀 JavaScript 固定在 `src/legacy/runtime-v029.js` 作為 compatibility runtime；新的房間狀態、權限、棋鐘、Replay、帳號、會員、管理與 UI 擴充則拆成一般 ES Modules。
 
@@ -47,27 +47,29 @@ npm test
 node build-worker.mjs
 ```
 
-`node build-worker.mjs` 會再做一次完整 regression suite 與 Wrangler production dry-run。候選整合以 Node 22 與 Cloudflare Workers Builds 的 Node 24 環境驗證。
+`node build-worker.mjs` 會做完整 regression suite 與 Wrangler dry-run。候選整合以 Node 22 與 Cloudflare Workers Builds 的 Node 24 環境驗證；只有 Cloudflare production branch `main` 會執行顯式 live Worker deploy。
 
 ## Cloudflare 設定
 
 目前 Git-connected Workers Build 使用：
 
+- Connected Worker project：`games`
 - Root directory：`/BoardVerse`
 - Build command：`node build-worker.mjs`
 - Deploy command：`npx wrangler deploy`
 - Production branch：`main`
 
-非 production branch 由 Cloudflare Workers Builds 使用 preview version upload，不應切換正式流量。
+Cloudflare Workers Builds 會為 Git-connected Worker 注入 `WRANGLER_CI_OVERRIDE_NAME`，因此 deploy command 本身會被固定到 connected Worker `games`。BoardVerse 的正式 hostname 目前仍由既有 Worker `crimson-haze-0a4d` 承接，所以 `main` 的 `build-worker.mjs` 在驗證完成後會複製環境、移除 `WRANGLER_CI_OVERRIDE_NAME`，並使用 `wrangler.jsonc` 顯式部署 `crimson-haze-0a4d`。這是 production-only 行為；preview/local build 不會執行。
 
 ### 正式網域與 Routing
 
-`wrangler.jsonc` 直接宣告正式 hostname，不再依賴 repository root 的 deploy adapter：
+`wrangler.jsonc` 的 production target：
 
-- Worker Route：`xn--gmqt6w03b11v.ray2025.com/*`，zone `ray2025.com`
-- Custom Domain：`xn--gmqt6w03b11v.ray2025.com`
+- Worker：`crimson-haze-0a4d`
+- Entry：`src/index-v011.js`
+- Custom Domain：`xn--gmqt6w03b11v.ray2025.com`（`多人棋室.ray2025.com`）
 
-保留兩者是為了接管既有環境中的 legacy catch-all Worker Route；Cloudflare Route 的匹配優先於同 hostname 的 Custom Domain，因此 route 必須同樣指向 `games`，否則舊 Worker 會先攔截請求。
+這個流程不搬移既有 hostname 到第二個 Worker，也不建立另一條 `hostname/*` route；它直接更新目前已承接正式流量的既有 Worker，避免 `games` 與 legacy Worker 之間的 routing 競爭。
 
 ### Durable Objects
 
