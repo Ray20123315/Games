@@ -6,6 +6,7 @@ import app, {
 import { appendEvent, ensureFeatureState, requireRevision, resetReady } from "./room/state.js";
 import { assertOwner } from "./room/roles.js";
 import { cancelDeadline } from "./room/deadline-scheduler.js";
+import { parseWsMessage } from "./protocol/messages.js";
 
 function memberById(room, id) {
   return room?.members?.find((member) => member.id === id) || null;
@@ -67,8 +68,8 @@ export class GameRoom extends AppGameRoom {
 
   async webSocketMessage(ws, message) {
     let msg = null;
-    try { msg = JSON.parse(String(message || "")); } catch {}
-    if (msg?.type !== "kick_member") return super.webSocketMessage(ws, message);
+    try { msg = parseWsMessage(message); } catch { return super.webSocketMessage(ws, message); }
+    if (msg.type !== "kick_member") return super.webSocketMessage(ws, message);
 
     await this.loadRoom();
     if (!this.room) return;
