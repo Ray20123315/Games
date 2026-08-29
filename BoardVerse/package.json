@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "wrangler deploy --dry-run --outdir dist --config wrangler.jsonc",
-    "test": "node test/core.test.mjs && node test/imports.test.mjs && node test/browser-scripts.test.mjs && node test/public-surface.test.mjs && node test/durable-db.test.mjs && node test/turnstile.test.mjs && node test/static.test.mjs && node test/legacy-preservation.test.mjs && node test/piece-theme.test.mjs && python test/schema_test.py",
+    "test": "node test/core.test.mjs && node test/imports.test.mjs && node test/browser-scripts.test.mjs && node test/public-surface.test.mjs && node test/durable-db.test.mjs && node test/turnstile.test.mjs && node test/static.test.mjs && node test/legacy-preservation.test.mjs && node test/piece-theme.test.mjs && node test/schema.test.mjs",
     "deploy": "wrangler deploy --config wrangler.jsonc",
     "deploy:dry": "wrangler deploy --dry-run --outdir dist --config wrangler.jsonc"
   },
