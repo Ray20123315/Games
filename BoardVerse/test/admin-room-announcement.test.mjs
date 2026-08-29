@@ -15,6 +15,7 @@ test("admin room announcement endpoint requires admin authentication", () => {
   assert.match(source, /await requireAdmin\(effectiveEnv, request\)/);
   assert.match(source, /ROOM_CODE_RE\.test\(roomId\)/);
   assert.match(source, /MAX_ROOM_ANNOUNCEMENT = 500/);
+  assert.match(source, /return toErrorResponse\(error\)/);
 });
 
 test("room announcement persists in feature state and broadcasts", () => {
@@ -35,4 +36,10 @@ test("room UI renders admin announcement from feature state", () => {
   assert.match(source, /bvRoomAnnouncement/);
   assert.match(source, /ADMIN 房內公告/);
   assert.match(source, /boardverse:feature/);
+});
+
+test("announcement changes are written to the admin audit log", () => {
+  assert.match(source, /room\.announcement_set/);
+  assert.match(source, /room\.announcement_clear/);
+  assert.match(source, /await audit\(effectiveEnv\.BOARDVERSE_DB/);
 });
