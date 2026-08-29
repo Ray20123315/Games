@@ -12,12 +12,14 @@
       { "name": "BOARDVERSE_DB_DO", "class_name": "BoardVerseDbV011" }
     ]
   },
-  "migrations": [
-    {
-      "tag": "boardverse-v011-visible-platform-20260829",
-      "new_sqlite_classes": ["GameRoomV011", "GlobalChatV011", "BoardVerseDbV011"]
-    }
-  ],
+  "exports": {
+    "GameRoom": { "type": "durable-object", "storage": "sqlite" },
+    "GlobalChat": { "type": "durable-object", "storage": "sqlite" },
+    "BoardVerseDb": { "type": "durable-object", "storage": "sqlite" },
+    "GameRoomV011": { "type": "durable-object", "storage": "sqlite" },
+    "GlobalChatV011": { "type": "durable-object", "storage": "sqlite" },
+    "BoardVerseDbV011": { "type": "durable-object", "storage": "sqlite" }
+  },
   "triggers": { "crons": ["0 16 * * *"] },
   "observability": { "enabled": true },
   "vars": {
