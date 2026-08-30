@@ -41,7 +41,7 @@ for (const marker of [
   '你的名稱','回場密碼（可不填）','bvRsOwnerName','bvRsReturnPassword','bvRsClearPassword','猜先／分色方式',
   '自訂房號（會員）','房號建立後永久不可修改','replayOverlay','100dvh','bvReplayPlayerBar','grid-template-columns:repeat(3','overflow:visible',
 ]) assert.ok(ui.includes(marker), `workspace UI missing ${marker}`);
-for (const marker of ['bv-room-settings-open','overflow-y:auto','bvRoomSlow','bvFocusGuardStatus','bvPublicNav','BoardVerse 服務模式調整']) {
+for (const marker of ['bv-room-settings-open','overflow-y:auto','bvRoomSlow','bvFocusGuardStatus','bvPublicNav','bvEmergencyNoticeTitle']) {
   assert.ok(urgentUi.includes(marker), `urgent v023 UI missing ${marker}`);
 }
 for (const marker of ['棋鐘 Preset','Fischer 5+3','Fischer 10+5','Bronstein 10+5','30 秒 × 5','bvRsClockPreset']) assert.ok(clockPresets.includes(marker), `clock preset addon missing ${marker}`);
