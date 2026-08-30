@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 
 const ui = await readFile(new URL("../src/ui/modern-ui.js", import.meta.url), "utf8");
+const urgent = await readFile(new URL("../src/ui/urgent-v023.js", import.meta.url), "utf8");
 const v020 = await readFile(new URL("../src/index-v020.js", import.meta.url), "utf8");
 const v022 = await readFile(new URL("../src/index-v022.js", import.meta.url), "utf8");
 const v023 = await readFile(new URL("../src/index-v023.js", import.meta.url), "utf8");
@@ -32,6 +33,12 @@ assert.match(v020, /if \(key === "BOARDVERSE_DB"\) return target\.BOARDVERSE_D1/
 assert.match(v020, /if \(key === "BOARDVERSE_DB_DO"\) return undefined/);
 assert.match(v020, /pathname\.startsWith\("\/admin\/"\)/);
 
+for (const marker of ['bvAuthErrorOverlay','bvAuthErrorDialog','bvAuthErrorMessage','AUTH_FORM_RE','hookAuthForms','showAuthError','new FormData(form)']) {
+  assert.ok(urgent.includes(marker), `v023 custom auth error modal missing ${marker}`);
+}
+assert.match(urgent, /\/\(\?:login\|register\|resend-verification\|forgot\|reset\|activate\)/);
+assert.doesNotMatch(urgent, /window\.alert\(/, 'v023 auth error handling must not fall back to native alert');
+
 for (const marker of ['memberIdentities','memberUsers','revision=revision+1','issueEmergencyChatIdentity','postAuthenticatedEmergencyGlobal','signPayload','verifySignedPayload']) {
   assert.ok(identity.includes(marker), `emergency identity missing ${marker}`);
 }
@@ -58,5 +65,12 @@ const bodyStart = ui.indexOf('>', scriptStart) + 1;
 const bodyEnd = ui.indexOf('</script>`;', bodyStart);
 assert.ok(bodyStart > scriptStart && bodyEnd > bodyStart, "modern UI inline script boundary invalid");
 new vm.Script(ui.slice(bodyStart, bodyEnd), { filename: "modern-ui.js" });
+
+const urgentScriptStart = urgent.indexOf('const SCRIPT = String.raw`<script');
+assert.ok(urgentScriptStart >= 0, "urgent v023 inline script missing");
+const urgentBodyStart = urgent.indexOf('>', urgentScriptStart) + 1;
+const urgentBodyEnd = urgent.indexOf('</script>`;', urgentBodyStart);
+assert.ok(urgentBodyStart > urgentScriptStart && urgentBodyEnd > urgentBodyStart, "urgent v023 script boundary invalid");
+new vm.Script(urgent.slice(urgentBodyStart, urgentBodyEnd), { filename: "urgent-v023.js" });
 
 console.log("modern-ui-d1-auth.test: PASS");
