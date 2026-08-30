@@ -26,6 +26,6 @@ assert.match(source, /INSERT OR IGNORE INTO chat_archive/);
 assert.match(source, /chatArchiveCursorId/);
 assert.match(source, /ctx\.waitUntil\(this\.flushArchive/);
 assert.doesNotMatch(source, /archiveChatMessage\(/, "global chat must batch archive instead of one DB call per message");
-assert.match(wrangler, /"main": "src\/index-v020\.js"/);
+assert.match(wrangler, /"main": "src\/index-v021\.js"/);
 
 console.log("chat-efficiency.test: PASS");

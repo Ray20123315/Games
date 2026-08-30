@@ -5,7 +5,7 @@ import vm from "node:vm";
 const source = await readFile(new URL("../src/index-v020.js", import.meta.url), "utf8");
 const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 
-assert.match(wrangler, /"main"\s*:\s*"src\/index-v020\.js"/);
+assert.match(wrangler, /"main"\s*:\s*"src\/index-v021\.js"/);
 assert.match(source, /from "\.\/index-v019\.js"/);
 assert.match(source, /pollEmergencyGlobalLite/);
 assert.match(source, /SELECT seq,id,sender_name,message_text,created_at FROM emergency_global_chat WHERE seq>\?/);
