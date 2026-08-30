@@ -43,6 +43,13 @@ for (const marker of [
   'cleanupEmergencyD1',
 ]) assert.ok(backend.includes(marker), `missing emergency backend marker: ${marker}`);
 
+for (const marker of [
+  'authenticatedRoomIdentity','resolveAuthenticatedRoomSession','emergencyAccountEnv',
+  'SELECT room_json FROM emergency_rooms','memberForUser',
+  'body.returnPassword = ""','body.sessionToken = existing.token',
+]) assert.ok(production.includes(marker), `production authenticated emergency rejoin missing ${marker}`);
+assert.match(production, /if \(emergencyEnabled\(env\)\) \{[\s\S]*?BOARDVERSE_D1\.prepare\("SELECT room_json FROM emergency_rooms/);
+
 const start = entry.indexOf('const EMERGENCY_CLIENT_SCRIPT = String.raw`<script');
 assert.ok(start >= 0, "emergency client script missing");
 const bodyStart = entry.indexOf('>', start) + 1;
