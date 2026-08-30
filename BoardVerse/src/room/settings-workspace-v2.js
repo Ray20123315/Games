@@ -1,6 +1,5 @@
 import { ensureFeatureState, resetReady } from "./state.js";
 import { applyRoomSettings as applyBaseSettings, roomSettingsSnapshot as baseSnapshot } from "./settings-workspace.js";
-import { switchRoomGame } from "./game-switch.js";
 
 function error(message, code) { const e = new Error(message); e.code = code; return e; }
 function targetQiguoCount(room, input) {
@@ -62,6 +61,10 @@ export async function applyRoomSettings(room, token, input = {}, { voiceAvailabl
     delete baseInput.gameId;
     delete baseInput.rules;
     await applyBaseSettings(room, token, baseInput);
+    // game-switch.js depends on the full Cloudflare Worker/DO runtime. Load it
+    // only for an actual game switch so Node regression tests can import the
+    // settings module without attempting to resolve Cloudflare-only schemes.
+    const { switchRoomGame } = await import("./game-switch.js");
     await switchRoomGame(room, requestedGameId, { voiceAvailable });
     const after = ensureFeatureState(room);
     after.voiceEnabled = targetIsQiguo || !voiceAvailable ? false : requestedVoice;
