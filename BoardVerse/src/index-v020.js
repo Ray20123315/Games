@@ -1,0 +1,127 @@
+import appV019 from "./index-v019.js";
+
+export * from "./index-v019.js";
+
+const GLOBAL_POLL_PATH = "/api/emergency/global/poll";
+
+function emergencyEnabled(env) {
+  if (!env?.BOARDVERSE_D1 || String(env.BOARDVERSE_EMERGENCY_D1 || "") !== "1") return false;
+  const until = Date.parse(String(env.BOARDVERSE_EMERGENCY_UNTIL || ""));
+  return !Number.isFinite(until) || Date.now() < until;
+}
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" },
+  });
+}
+
+async function pollEmergencyGlobalLite(db, requestUrl) {
+  const url = new URL(requestUrl);
+  const since = Math.max(0, Number(url.searchParams.get("since") || 0));
+  const initial = url.searchParams.get("initial") === "1";
+  if (initial) {
+    const result = await db.prepare(
+      "SELECT seq,id,sender_name,message_text,created_at FROM emergency_global_chat ORDER BY seq DESC LIMIT 100",
+    ).all();
+    const rows = (result?.results || []).slice().reverse();
+    return json({
+      ok: true,
+      initial: true,
+      lastSeq: Number(rows.at(-1)?.seq || 0),
+      messages: rows.map((r) => ({ id:r.id,name:r.sender_name,text:r.message_text,at:Number(r.created_at),seq:Number(r.seq) })),
+      emergency: true,
+    });
+  }
+  const result = await db.prepare(
+    "SELECT seq,id,sender_name,message_text,created_at FROM emergency_global_chat WHERE seq>? ORDER BY seq ASC LIMIT 100",
+  ).bind(since).all();
+  const rows = result?.results || [];
+  return json({
+    ok: true,
+    initial: false,
+    lastSeq: Number(rows.at(-1)?.seq || since),
+    messages: rows.map((r) => ({ id:r.id,name:r.sender_name,text:r.message_text,at:Number(r.created_at),seq:Number(r.seq) })),
+    emergency: true,
+  });
+}
+
+const NOTICE_STYLE = `<style id="boardverse-emergency-notice-style">
+#bvEmergencyNotice[hidden]{display:none!important}#bvEmergencyNotice{position:fixed;inset:0;z-index:2147483646;display:grid;place-items:center;padding:20px;background:rgba(0,0,0,.7);backdrop-filter:blur(7px)}#bvEmergencyNotice .bv-emergency-dialog{position:relative;width:min(560px,100%);max-height:min(82vh,680px);overflow:auto;border:1px solid #7b6435;border-radius:18px;background:linear-gradient(180deg,#1b1710,#100e0b);color:#f8f1df;box-shadow:0 28px 90px rgba(0,0,0,.55);padding:24px}#bvEmergencyNotice h2{margin:0 38px 12px 0;font-size:20px;line-height:1.35;color:#ffe89a}#bvEmergencyNotice p{margin:9px 0;color:#ddd2b7;font-size:14px;line-height:1.7}#bvEmergencyNotice .bv-emergency-ok{display:block;width:100%;margin-top:18px;border:1px solid #b18b32;border-radius:11px;background:linear-gradient(180deg,#d5ad45,#9a731d);color:#171108;font-weight:900;font-size:14px;padding:11px 14px;cursor:pointer}#bvEmergencyNotice .bv-emergency-close{position:absolute;right:14px;top:14px;width:34px;height:34px;border:1px solid #56482f;border-radius:10px;background:#17140f;color:#f4e7c3;font-size:18px;cursor:pointer}#bvEmergencyNotice .bv-emergency-today{display:flex;align-items:center;gap:9px;margin-top:15px;padding:11px 12px;border:1px solid #403722;border-radius:11px;background:#15120d;color:#eee2c4;font-size:13px;font-weight:800}#bvEmergencyNotice .bv-emergency-today input{width:17px;height:17px;accent-color:#c89b34}@media(max-width:560px){#bvEmergencyNotice{padding:12px}#bvEmergencyNotice .bv-emergency-dialog{padding:20px 16px}}
+</style>`;
+
+const NOTICE_HTML = `<div id="bvEmergencyNotice" role="dialog" aria-modal="true" aria-labelledby="bvEmergencyNoticeTitle" hidden><div class="bv-emergency-dialog"><button type="button" class="bv-emergency-close" aria-label="關閉">×</button><h2 id="bvEmergencyNoticeTitle">BoardVerse 服務模式說明</h2><p>Cloudflare Durable Objects 今日免費額度已用完，BoardVerse 已自動切換到<strong>緊急 D1 模式</strong>，不是整站停機。</p><p><strong>目前可用：</strong>以訪客名稱建立新房間、加入玩家／觀戰、下棋、房內文字聊天與全局聊天室。</p><p><strong>暫時受限：</strong>今天原本存在 Durable Objects 裡的舊房間、帳號／會員資料、P2P 語音與依賴 DO Alarm 的離線判負。額度重置後會自動恢復完整模式。</p><label class="bv-emergency-today"><input id="bvEmergencyNoticeToday" type="checkbox">今天不再顯示</label><button type="button" class="bv-emergency-ok">我知道了</button></div></div>`;
+
+const NOTICE_SCRIPT = `<script id="boardverse-emergency-notice-script">(function(){'use strict';var root=document.getElementById('bvEmergencyNotice');if(!root)return;var check=document.getElementById('bvEmergencyNoticeToday'),ok=root.querySelector('.bv-emergency-ok'),close=root.querySelector('.bv-emergency-close');function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}var key='boardverseEmergencyNoticeDismissed';function hide(){try{if(check&&check.checked)localStorage.setItem(key,today())}catch(e){}root.hidden=true}try{if(localStorage.getItem(key)!==today()){root.hidden=false;setTimeout(function(){if(ok)ok.focus()},0)}}catch(e){root.hidden=false}if(ok)ok.addEventListener('click',hide);if(close)close.addEventListener('click',hide);root.addEventListener('click',function(e){if(e.target===root)hide()});document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!root.hidden)hide()})})();</script>`;
+
+function stripOldNotices(body) {
+  return body
+    .replace(/<div id="boardverse-do-quota-notice"[\s\S]*?<\/div>/gi, "")
+    .replace(/<div id="boardverse-emergency-d1-banner"[\s\S]*?<\/div>/gi, "");
+}
+
+function patchHomeNavigation(body) {
+  const oldBoot = "if(ready&&session&&session.roomId&&session.token&&(!code||session.roomId===code)){connectRoom()}";
+  const newBoot = "if(ready&&code&&session&&session.roomId&&session.token&&session.roomId===code){connectRoom()}";
+  return body.replace(oldBoot, newBoot);
+}
+
+function patchEmergencyPolling(body) {
+  body = body.replace(
+    "async _roomLoop(){while(!this._closed){try{var d=await jsonFetch('/api/emergency/rooms/'",
+    "async _roomLoop(){while(!this._closed){try{if(document.visibilityState==='hidden')await sleep(15000);var d=await jsonFetch('/api/emergency/rooms/'",
+  );
+  body = body.replace(
+    "async _globalLoop(initial){var first=!!initial;while(!this._closed){try{var path='/api/emergency/global/poll?since='",
+    "async _globalLoop(initial){var first=!!initial;while(!this._closed){try{var card=document.getElementById('bvGlobalChat'),rect=card&&card.getBoundingClientRect();if(document.visibilityState==='hidden'||(rect&&(rect.bottom<0||rect.top>innerHeight*1.25))){await sleep(document.visibilityState==='hidden'?60000:20000);continue}var path='/api/emergency/global/poll?since='",
+  );
+  body = body.replace(
+    "if(Number.isFinite(Number(d.lastSeq)))this._globalSeq=Number(d.lastSeq)}catch(e)",
+    "if(Number.isFinite(Number(d.lastSeq)))this._globalSeq=Number(d.lastSeq);await sleep(10000)}catch(e)",
+  );
+  body = body.replace(
+    "setInterval(function(){if($('lobby')&&!$('lobby').classList.contains('hidden'))refreshRooms()},12000);",
+    "setInterval(function(){if($('lobby')&&!$('lobby').classList.contains('hidden'))refreshRooms()},45000);",
+  );
+  return body;
+}
+
+async function improveHtml(response) {
+  const type = response.headers.get("content-type") || "";
+  if (!type.includes("text/html")) return response;
+  let body = await response.text();
+  body = patchHomeNavigation(body);
+  const emergency = response.headers.get("x-boardverse-emergency") === "d1" || body.includes("boardverse-emergency-d1-client");
+  if (emergency) {
+    body = stripOldNotices(body);
+    body = patchEmergencyPolling(body);
+    if (!body.includes("boardverse-emergency-notice-style")) {
+      body = body.replace(/<\/head>/i, `${NOTICE_STYLE}</head>`);
+    }
+    if (!body.includes("bvEmergencyNotice")) {
+      body = body.replace(/<\/body>/i, `${NOTICE_HTML}${NOTICE_SCRIPT}</body>`);
+    }
+  }
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  headers.set("cache-control", "no-store");
+  headers.set("x-boardverse-history-fix", "root-does-not-resume-room");
+  if (emergency) headers.set("x-boardverse-emergency-notice", "modal");
+  return new Response(body, { status: response.status, statusText: response.statusText, headers });
+}
+
+export default {
+  async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    if (emergencyEnabled(env) && url.pathname === GLOBAL_POLL_PATH && request.method === "GET") {
+      try { return await pollEmergencyGlobalLite(env.BOARDVERSE_D1, request.url); }
+      catch { /* schema may not exist yet; let v019 create/use it */ }
+    }
+    const response = await appV019.fetch(request, env, ctx);
+    return improveHtml(response);
+  },
+  scheduled(event, env, ctx) {
+    return appV019.scheduled(event, env, ctx);
+  },
+};
