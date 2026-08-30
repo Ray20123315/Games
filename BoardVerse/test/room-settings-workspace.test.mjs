@@ -30,9 +30,10 @@ for (const marker of [
 for (const marker of ['voiceEnabled','voiceAvailable','voice_unavailable_emergency','voice_requires_two_players','targetQiguoCount','applyQiguoCapacity']) {
   assert.ok(serverV2.includes(marker), `server v2 missing ${marker}`);
 }
+assert.match(serverV2, /switchingGame && room\.status === "playing"/, "settings layer must reject game switching during an active match");
 assert.doesNotMatch(serverV2, /^import[^\n]*game-switch\.js/m, "settings module must remain importable by plain Node tests");
 assert.match(serverV2, /await import\("\.\/game-switch\.js"\)/, "Cloudflare game runtime must load only for an actual game switch");
-for (const marker of ['switchRoomGame','CurrentGameRoom','room.status === "playing"','room.gameId = gameId','room.currentReplay = null','resetReady(room, false)']) {
+for (const marker of ['switchRoomGame','CurrentGameRoom','room?.status === "playing"','room.gameId = gameId','room.currentReplay = null','resetReady(room, false)']) {
   assert.ok(gameSwitch.includes(marker), `game switch missing ${marker}`);
 }
 for (const marker of [
@@ -111,6 +112,7 @@ function fixture({ account = false, playing = false } = {}) {
 {
   const room = fixture({ playing: true });
   await assert.rejects(() => applyRoomSettings(room, "owner-token", { revision: 4, rules: { variant: "exact5" } }), /對局進行中不可變更/);
+  await assert.rejects(() => applyRoomSettings(room, "owner-token", { revision: 4, gameId: "go9" }), /對局進行中不可切換棋類/);
   const saved = await applyRoomSettings(room, "owner-token", { revision: 4, roomName: "Live Room", playerChatSlowSeconds: 3, spectatorChatSlowSeconds: 4, returnPassword: "live-pass" });
   assert.equal(saved.roomName, "Live Room");
   assert.equal(room.bv.playerChatSlowMs, 3000);
