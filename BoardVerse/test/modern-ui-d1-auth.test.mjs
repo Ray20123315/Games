@@ -1,0 +1,58 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import vm from "node:vm";
+
+const ui = await readFile(new URL("../src/ui/modern-ui.js", import.meta.url), "utf8");
+const v020 = await readFile(new URL("../src/index-v020.js", import.meta.url), "utf8");
+const identity = await readFile(new URL("../src/emergency/d1-identity.js", import.meta.url), "utf8");
+const edge = await readFile(new URL("../src/edge-proxy.js", import.meta.url), "utf8");
+const origin = await readFile(new URL("../src/origin-v022.js", import.meta.url), "utf8");
+const originConfig = await readFile(new URL("../wrangler.origin.example.jsonc", import.meta.url), "utf8");
+const edgeConfig = await readFile(new URL("../wrangler.edge.example.jsonc", import.meta.url), "utf8");
+const production = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+
+for (const marker of [
+  'page-theme-scifi','boardverseThemeV2','bvThemeSciFi','input[type="checkbox"]','appearance:none',
+  'bv-room-action-strip','bvCopyLink','bvFocusGuardButton','#ruleInfo','bv-level-1','bv-level-2','bv-level-3','bv-level-4','bv-level-5',
+  'bvAdminReflect','bvOwnerReflect','bvTitleReflect','bv-id-title','bv-room-id-title',
+]) assert.ok(ui.includes(marker), `modern UI missing ${marker}`);
+assert.match(ui, /#55fff1/);
+assert.match(ui, /#fff2a2/);
+assert.match(ui, /#c497ff/);
+assert.match(ui, /themeValue\(\).*scifi/s);
+
+for (const marker of [
+  'appV018','emergencyAccountEnv','BOARDVERSE_DB','BOARDVERSE_D1','isEmergencyAccountPath',
+  'sessionUser','getUserMembership','publicIdentityForUser','attachEmergencyRoomIdentity','injectModernUi',
+  'ADMIN 可直接使用原本管理憑證登入',
+]) assert.ok(v020.includes(marker), `v020 D1 auth/UI missing ${marker}`);
+assert.match(v020, /if \(key === "BOARDVERSE_DB"\) return target\.BOARDVERSE_D1/);
+assert.match(v020, /if \(key === "BOARDVERSE_DB_DO"\) return undefined/);
+assert.match(v020, /pathname\.startsWith\("\/admin\/"\)/);
+
+for (const marker of ['memberIdentities','memberUsers','revision=revision+1','issueEmergencyChatIdentity','postAuthenticatedEmergencyGlobal','signPayload','verifySignedPayload']) {
+  assert.ok(identity.includes(marker), `emergency identity missing ${marker}`);
+}
+
+for (const marker of ['BOARDVERSE_ORIGIN_URL','x-boardverse-original-origin','x-boardverse-edge-secret','fetch(withHeaders)']) {
+  assert.ok(edge.includes(marker), `edge proxy missing ${marker}`);
+}
+for (const marker of ['index-v021.js','BOARDVERSE_EDGE_SHARED_SECRET','x-boardverse-original-origin','new Request(forwarded, { headers })']) {
+  assert.ok(origin.includes(marker), `origin wrapper missing ${marker}`);
+}
+assert.match(originConfig, /"binding"\s*:\s*"BOARDVERSE_DB"/);
+assert.match(originConfig, /"GLOBAL_CHAT"\s*,\s*"class_name"\s*:\s*"GlobalChat"/);
+assert.match(originConfig, /REPLACE_WITH_NEW_ACCOUNT_D1_DATABASE_ID/);
+assert.match(edgeConfig, /xn--gmqt6w03b11v\.ray2025\.com/);
+assert.match(edgeConfig, /REPLACE_WITH_NEW_ACCOUNT_SUBDOMAIN/);
+assert.match(production, /"main"\s*:\s*"src\/index-v021\.js"/);
+assert.match(production, /"database_name"\s*:\s*"games-boardverse-recovery-20260830-v2"/);
+
+const scriptStart = ui.indexOf('const MODERN_UI_SCRIPT = String.raw`<script');
+assert.ok(scriptStart >= 0, "modern UI inline script missing");
+const bodyStart = ui.indexOf('>', scriptStart) + 1;
+const bodyEnd = ui.indexOf('</script>`;', bodyStart);
+assert.ok(bodyStart > scriptStart && bodyEnd > bodyStart, "modern UI inline script boundary invalid");
+new vm.Script(ui.slice(bodyStart, bodyEnd), { filename: "modern-ui.js" });
+
+console.log("modern-ui-d1-auth.test: PASS");
