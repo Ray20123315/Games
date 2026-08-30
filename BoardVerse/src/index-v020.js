@@ -87,12 +87,12 @@ function patchEmergencyPolling(body) {
   return body;
 }
 
-async function improveHtml(response) {
+async function improveHtml(response, forceEmergency = false) {
   const type = response.headers.get("content-type") || "";
   if (!type.includes("text/html")) return response;
   let body = await response.text();
   body = patchHomeNavigation(body);
-  const emergency = response.headers.get("x-boardverse-emergency") === "d1" || body.includes("boardverse-emergency-d1-client");
+  const emergency = !!forceEmergency || response.headers.get("x-boardverse-emergency") === "d1" || body.includes("boardverse-emergency-d1-client");
   if (emergency) {
     body = stripOldNotices(body);
     body = patchEmergencyPolling(body);
@@ -114,12 +114,13 @@ async function improveHtml(response) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
-    if (emergencyEnabled(env) && url.pathname === GLOBAL_POLL_PATH && request.method === "GET") {
+    const emergency = emergencyEnabled(env);
+    if (emergency && url.pathname === GLOBAL_POLL_PATH && request.method === "GET") {
       try { return await pollEmergencyGlobalLite(env.BOARDVERSE_D1, request.url); }
       catch { /* schema may not exist yet; let v019 create/use it */ }
     }
     const response = await appV019.fetch(request, env, ctx);
-    return improveHtml(response);
+    return improveHtml(response, emergency);
   },
   scheduled(event, env, ctx) {
     return appV019.scheduled(event, env, ctx);
