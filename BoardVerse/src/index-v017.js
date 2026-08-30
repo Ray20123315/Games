@@ -39,11 +39,11 @@ export class GameRoom extends GameRoomBase {
     const userId = bv.memberUsers?.[member.id] || member.userId || null;
     if (!userId || String(userId).startsWith("admin:")) return;
 
-    if (!this._roomChatModerationCache) this._roomChatModerationCache = new Map();
+    if (!bv.chatModerationCache || typeof bv.chatModerationCache !== "object") bv.chatModerationCache = {};
     const now = Date.now();
     const key = String(userId);
-    let cached = this._roomChatModerationCache.get(key);
-    if (!cached || cached.expiresAt <= now) {
+    let cached = bv.chatModerationCache[key];
+    if (!cached || Number(cached.expiresAt || 0) <= now) {
       const row = await this.env.BOARDVERSE_DB.prepare(`SELECT
         (SELECT status FROM users WHERE id=?) AS status,
         (SELECT suspended_until FROM users WHERE id=?) AS suspended_until,
@@ -54,7 +54,7 @@ export class GameRoom extends GameRoomBase {
       const mutedUntil = Number(row?.muted_until || 0);
       const restricted = !!status && status !== "active" && !(status === "suspended" && suspendedUntil > 0 && suspendedUntil <= now);
       cached = { restricted, mutedUntil, expiresAt: now + ROOM_CHAT_MODERATION_TTL_MS };
-      this._roomChatModerationCache.set(key, cached);
+      bv.chatModerationCache[key] = cached;
     }
     if (cached.restricted) throw moderationError("帳號目前已停權、封禁或停用，不能使用房內聊天室。", "account_restricted");
     if (Number(cached.mutedUntil || 0) > now) throw moderationError("你目前被禁止在房內聊天室發言。", "chat_muted");
@@ -118,7 +118,13 @@ function parseSetting(value, fallback) {
 
 export class GlobalChat extends GlobalChatBase {
   async globalPolicy(now = Date.now()) {
-    if (this._globalPolicyCache && this._globalPolicyCache.expiresAt > now) return this._globalPolicyCache;
+    let cached = this._globalPolicyCache;
+    if (!cached || Number(cached.expiresAt || 0) <= now) cached = await this.ctx.storage.get("globalPolicyCache");
+    if (cached && Number(cached.expiresAt || 0) > now) {
+      this._globalPolicyCache = cached;
+      return cached;
+    }
+
     let slowMs = 5000, enabled = true;
     if (this.env?.BOARDVERSE_DB) {
       const result = await this.env.BOARDVERSE_DB.prepare("SELECT key,value_json FROM system_settings WHERE key IN ('global_chat_slow_ms','global_chat_enabled')").all();
@@ -129,19 +135,19 @@ export class GlobalChat extends GlobalChatBase {
     }
     const policy = { slowMs: Math.max(1200, Number(slowMs) || 5000), enabled, expiresAt: now + GLOBAL_POLICY_TTL_MS };
     this._globalPolicyCache = policy;
+    await this.ctx.storage.put("globalPolicyCache", policy);
     return policy;
   }
 
-  async globalMute(identity, now = Date.now()) {
+  async globalMute(attachment, identity, now = Date.now()) {
     if (!identity || !this.env?.BOARDVERSE_DB) return 0;
-    if (!this._globalMuteCache) this._globalMuteCache = new Map();
     const key = `${String(identity.kind || "guest")}:${String(identity.id || "")}`;
-    const cached = this._globalMuteCache.get(key);
-    if (cached && cached.expiresAt > now) return Number(cached.mutedUntil || 0);
+    const cached = attachment?.globalMuteCache;
+    if (cached && cached.key === key && Number(cached.expiresAt || 0) > now) return Number(cached.mutedUntil || 0);
     const row = await this.env.BOARDVERSE_DB.prepare("SELECT muted_until FROM chat_mutes WHERE subject_type=? AND subject_id=? AND channel='global'")
       .bind(identity.kind, identity.id).first();
     const mutedUntil = Number(row?.muted_until || 0);
-    this._globalMuteCache.set(key, { mutedUntil, expiresAt: now + GLOBAL_MUTE_TTL_MS });
+    attachment.globalMuteCache = { key, mutedUntil, expiresAt: now + GLOBAL_MUTE_TTL_MS };
     return mutedUntil;
   }
 
@@ -190,6 +196,9 @@ export class GlobalChat extends GlobalChatBase {
     this._pendingArchiveCount = Number(this._pendingArchiveCount || 0) + 1;
     if (this._pendingArchiveCount >= GLOBAL_ARCHIVE_BATCH) {
       this._pendingArchiveCount = 0;
+      const alarm = await this.ctx.storage.getAlarm();
+      if (alarm != null) await this.ctx.storage.deleteAlarm();
+      this._archiveAlarmSet = false;
       this.ctx.waitUntil(this.flushArchive().catch(() => {}));
       return;
     }
@@ -215,7 +224,9 @@ export class GlobalChat extends GlobalChatBase {
     const recent = Array.isArray(attachment.recent) ? attachment.recent.filter((x) => now - Number(x.at || 0) < 10_000) : [];
     if (recent.length >= 5) { this.safeSend(ws, { type: "global_error", message: "短時間訊息過多。" }); return; }
     if (recent.filter((x) => x.text === text).length >= 2) { this.safeSend(ws, { type: "global_error", message: "請勿重複洗版。" }); return; }
-    if (Number(await this.globalMute(identity, now)) > now) { this.safeSend(ws, { type: "global_error", message: "你目前被禁止在全局聊天室發言。" }); return; }
+    const mutedUntil = Number(await this.globalMute(attachment, identity, now));
+    ws.serializeAttachment(attachment);
+    if (mutedUntil > now) { this.safeSend(ws, { type: "global_error", message: "你目前被禁止在全局聊天室發言。" }); return; }
 
     const badge = String(identity.badge || (identity.kind === "guest" ? "訪客" : "會員")).slice(0, 16);
     const rawName = String(identity.name || "Guest").slice(0, 40);
