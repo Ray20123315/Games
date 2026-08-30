@@ -1,6 +1,8 @@
-export const ROOM_LIVE_FIXES_SCRIPT = String.raw`<style id="boardverse-room-live-fixes-style">
+const ROOM_LIVE_FIXES_STYLE = String.raw`<style id="boardverse-room-live-fixes-style">
 #bvClockRow[hidden]{display:none!important}#bvClockRow{display:flex;align-items:center;width:100%;min-height:34px;padding:7px 10px;border:1px solid var(--line);border-radius:9px;background:var(--panel3);box-sizing:border-box}#bvClockRow #bvClock{display:block!important;width:100%;margin:0!important;white-space:normal!important;overflow-wrap:anywhere}
-</style><script id="boardverse-room-live-fixes">(function(){
+</style>`;
+
+export const ROOM_LIVE_FIXES_SCRIPT = String.raw`<script id="boardverse-room-live-fixes">(function(){
 'use strict';if(window.__BOARDVERSE_ROOM_LIVE_FIXES__)return;window.__BOARDVERSE_ROOM_LIVE_FIXES__=true;
 var feature=null,pending=false;
 function byId(id){return document.getElementById(id)}
@@ -17,10 +19,7 @@ if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',
 
 export function injectRoomLiveFixes(source) {
   let body = String(source || '');
-  if (!body.includes('id="boardverse-room-live-fixes-style"')) body = /<\/head>/i.test(body) ? body.replace(/<\/head>/i, `${ROOM_LIVE_FIXES_SCRIPT.split('<script id="boardverse-room-live-fixes">')[0]}</head>`) : ROOM_LIVE_FIXES_SCRIPT.split('<script id="boardverse-room-live-fixes">')[0] + body;
-  if (!body.includes('id="boardverse-room-live-fixes"')) {
-    const script = '<script id="boardverse-room-live-fixes">' + ROOM_LIVE_FIXES_SCRIPT.split('<script id="boardverse-room-live-fixes">')[1];
-    body = /<\/body>/i.test(body) ? body.replace(/<\/body>/i, `${script}</body>`) : body + script;
-  }
+  if (!body.includes('id="boardverse-room-live-fixes-style"')) body = /<\/head>/i.test(body) ? body.replace(/<\/head>/i, `${ROOM_LIVE_FIXES_STYLE}</head>`) : ROOM_LIVE_FIXES_STYLE + body;
+  if (!body.includes('id="boardverse-room-live-fixes"')) body = /<\/body>/i.test(body) ? body.replace(/<\/body>/i, `${ROOM_LIVE_FIXES_SCRIPT}</body>`) : body + ROOM_LIVE_FIXES_SCRIPT;
   return body;
 }
