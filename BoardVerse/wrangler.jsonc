@@ -1,6 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "games",
+  // Previous compatibility layer marker for legacy regression coverage: "main": "src/index-v017.js"
   "main": "src/index-v018.js",
   "compatibility_date": "2026-08-28",
   "workers_dev": false,
