@@ -1,4 +1,4 @@
-import { RoomSettingsGameRoom } from "../room/settings-room.js";
+import { RoomSettingsGameRoom } from "../room/settings-room-safe.js";
 import { ensureEmergencySchema } from "./d1-mode.js";
 
 const POLL_MS = 2000;
