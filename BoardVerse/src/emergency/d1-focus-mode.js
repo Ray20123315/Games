@@ -1,4 +1,4 @@
-import { FocusGuardGameRoom } from "../room/focus-guard-room.js";
+import { RoomSettingsGameRoom } from "../room/settings-room.js";
 import { ensureEmergencySchema } from "./d1-mode.js";
 
 const POLL_MS = 2000;
@@ -6,7 +6,7 @@ const POLL_LOOPS = 8;
 const MUTATING_TYPES = new Set([
   "move","pass","swap_sides","resign","ready","undo_request","undo_accept","undo_reject",
   "rematch","rematch_request","rematch_accept","review_join","queue_move","queue_settings",
-  "room_chat_settings","chat","host_kick","qiguo_choose","opening_guess","opening_choose","opening_hand",
+  "room_chat_settings","room_settings_update","chat","host_kick","qiguo_choose","opening_guess","opening_choose","opening_hand",
   "focus_guard_settings","focus_violation",
 ]);
 
@@ -36,7 +36,7 @@ function fakeContext() {
 }
 
 function engineFor(room) {
-  const engine = Object.create(FocusGuardGameRoom.prototype);
+  const engine = Object.create(RoomSettingsGameRoom.prototype);
   engine.room = room ? structuredClone(room) : null;
   engine.env = {};
   engine.ctx = fakeContext();
