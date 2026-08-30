@@ -99,7 +99,7 @@ async function improveHtml(response) {
     if (!body.includes("boardverse-emergency-notice-style")) {
       body = body.replace(/<\/head>/i, `${NOTICE_STYLE}</head>`);
     }
-    if (!body.includes("bvEmergencyNotice")) {
+    if (!body.includes('id="bvEmergencyNotice"')) {
       body = body.replace(/<\/body>/i, `${NOTICE_HTML}${NOTICE_SCRIPT}</body>`);
     }
   }
