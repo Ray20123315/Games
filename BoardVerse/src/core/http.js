@@ -71,7 +71,7 @@ export function cookie(name, value, { maxAge = null, path = "/", httpOnly = true
   const parts = [`${name}=${encodeURIComponent(value)}`, `Path=${path}`, `SameSite=${sameSite}`];
   if (httpOnly) parts.push("HttpOnly");
   if (secure) parts.push("Secure");
-  if (Number.isFinite(maxAge)) parts.push(`Max-Age=${Math.max(0, Math.floor(maxAge))`);
+  if (Number.isFinite(maxAge)) parts.push(`Max-Age=${Math.max(0, Math.floor(maxAge))}`);
   return parts.join("; ");
 }
 
