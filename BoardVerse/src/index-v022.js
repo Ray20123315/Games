@@ -67,13 +67,14 @@ export class GameRoom extends GameRoomV021 {
       }
       const body = await request.json().catch(() => ({}));
       try {
-        const settings = applyRoomSettings(this.room, String(body.token || ""), body.input || {});
+        const settings = await applyRoomSettings(this.room, String(body.token || ""), body.input || {});
         await this.saveRoom();
         await this.syncLobby();
         await this.broadcastState();
         return json({ ok: true, settings });
       } catch (error) {
-        return errorJson(error?.message || "房間設定更新失敗。", error?.code === "owner_required" ? 403 : 400, error?.code || "settings_failed");
+        const status = error?.code === "owner_required" ? 403 : error?.code === "stale_revision" ? 409 : 400;
+        return errorJson(error?.message || "房間設定更新失敗。", status, error?.code || "settings_failed");
       }
     }
     return super.fetch(request);
