@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS opponent_daily_gp (
  gp_eligible_games INTEGER NOT NULL DEFAULT 0, total_games INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id,opponent_user_id,date_key)
 );
 CREATE TABLE IF NOT EXISTS gp_events (
- id TEXT PRIMARY KEY, user_id TEXT NOT NULL, amount INTEGER NOT NULL, reason TEXT NOT NULL, created_at INTEGER NOT NULL
+ id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, amount INTEGER NOT NULL, reason TEXT NOT NULL, created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_gp_events_user ON gp_events(user_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS room_presets (
