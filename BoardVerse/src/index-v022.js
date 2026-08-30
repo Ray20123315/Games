@@ -3,6 +3,7 @@ import { injectRoomWorkspace } from "./ui/room-workspace-ui.js";
 import { injectClockPresetAddon } from "./ui/room-clock-presets.js";
 import { injectAccountPresetAddon } from "./ui/room-account-presets.js";
 import { injectRuleSelectAddon } from "./ui/room-rule-selects.js";
+import { injectVoiceSettingsAddon } from "./ui/room-voice-settings.js";
 import { applyRoomSettings, emergencyRoomSettings, roomSettingsSnapshot } from "./room/settings-workspace-v2.js";
 import { errorJson, json } from "./core/http.js";
 
@@ -28,6 +29,7 @@ async function injectHtml(response) {
   body = injectClockPresetAddon(body);
   body = injectAccountPresetAddon(body);
   body = injectRuleSelectAddon(body);
+  body = injectVoiceSettingsAddon(body);
   const headers = new Headers(response.headers);
   headers.delete("content-length");
   headers.set("cache-control", "no-store");
