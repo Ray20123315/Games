@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const source = await readFile(new URL("../src/index-v018.js", import.meta.url), "utf8");
+const production = await readFile(new URL("../src/index-v022.js", import.meta.url), "utf8");
 const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 
-assert.match(wrangler, /"main"\s*:\s*"src\/index-v021\.js"/);
+assert.match(wrangler, /"main"\s*:\s*"src\/index-v022\.js"/);
+assert.match(production, /from "\.\/index-v021\.js"/);
 assert.match(source, /from "\.\/index-v017\.js"/);
 assert.match(source, /Exceeded allowed volume of requests in Durable Objects free tier/);
 assert.match(source, /isDoQuotaResponse/);
