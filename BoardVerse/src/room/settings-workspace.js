@@ -26,6 +26,10 @@ function sanitizeRules(current, incoming) {
   for (const key of Object.keys(out)) if (Object.prototype.hasOwnProperty.call(incoming, key)) out[key] = sameTypeRule(out[key], incoming[key]);
   return out;
 }
+function sameJson(a, b) {
+  try { return JSON.stringify(a) === JSON.stringify(b); }
+  catch { return false; }
+}
 function memberByToken(room, token) {
   return room?.members?.find((m) => String(m?.token || "") === String(token || "")) || null;
 }
@@ -42,6 +46,16 @@ function disableQueue(room) {
     const member = memberById(room, id);
     if (member) { member.role = "spectator"; member.side = null; }
   }
+}
+function coreSettingsChanged(room, bv, input) {
+  if (input.gameId && String(input.gameId) !== String(room.gameId)) return true;
+  if ("queueEnabled" in input && room.gameId !== "qiguo" && !!input.queueEnabled !== !!room.settings?.queueEnabled) return true;
+  if ("rotationPolicy" in input && ROTATIONS.has(String(input.rotationPolicy)) && String(input.rotationPolicy) !== String(room.settings?.rotationPolicy || "winner_stays")) return true;
+  if (input.rules && typeof input.rules === "object" && !sameJson(sanitizeRules(room.rules, input.rules), room.rules || {})) return true;
+  if (input.clockConfig && typeof input.clockConfig === "object" && !sameJson(normalizeClockConfig(input.clockConfig), normalizeClockConfig(bv.clockConfig || { mode: "untimed" }))) return true;
+  if ("focusGuardEnabled" in input && (input.focusGuardEnabled !== false) !== (bv.focusGuardEnabled !== false)) return true;
+  if ("focusGuardAllowedLeaves" in input && clampInt(input.focusGuardAllowedLeaves, 0, 20, 0) !== clampInt(bv.focusGuardAllowedLeaves, 0, 20, 0)) return true;
+  return false;
 }
 
 export function roomSettingsSnapshot(room, token) {
@@ -76,8 +90,7 @@ export function applyRoomSettings(room, token, input = {}) {
   }
   const bv = ensureFeatureState(room);
   const playing = room.status === "playing";
-  const wantsCore = input.rules || input.clockConfig || "queueEnabled" in input || "rotationPolicy" in input || "gameId" in input || "focusGuardEnabled" in input || "focusGuardAllowedLeaves" in input;
-  if (playing && wantsCore) {
+  if (playing && coreSettingsChanged(room, bv, input)) {
     const error = new Error("對局進行中不可變更棋類、規則、棋鐘、輪替或防切頁規則；請在本局結束後再儲存這些設定。");
     error.code = "settings_locked_during_match";
     throw error;
