@@ -58,7 +58,7 @@ assert.match(v014, /boardverse-unified-modal/);
 assert.match(v014, /window\.alert=function/);
 assert.match(v014, /window\.prompt=function/);
 assert.match(v014, /window\.confirm=function/);
-assert.match(wrangler, /"main": "src\/index-v023\.js"/);
+assert.match(wrangler, /"main": "src\/index-v024\.js"/);
 assert.match(production, /from "\.\/index-v022\.js"/);
 
 console.log("view-only-replay-custom-modal.test: PASS (readable admin replays + enhanced room replay player)");
