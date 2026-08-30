@@ -12,7 +12,10 @@
     }
   ],
   "d1_databases": [
-    { "binding": "BOARDVERSE_D1" }
+    {
+      "binding": "BOARDVERSE_D1",
+      "database_name": "games-boardverse-recovery-20260830-v2"
+    }
   ],
   "durable_objects": {
     "bindings": [
