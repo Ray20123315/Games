@@ -2,6 +2,8 @@ import appV022, { GameRoom as GameRoomV022 } from "./index-v022.js";
 import { injectUrgentV023 } from "./ui/urgent-v023.js";
 import { injectAuthenticatedRoomFields } from "./ui/authenticated-room-fields.js";
 import { injectRoomLiveFixes } from "./ui/room-live-fixes.js";
+import { improveV023Html } from "./ui/v023-polish.js";
+import { emergencyAdminRead } from "./emergency/d1-admin-view.js";
 import { ensureDbSchema, withDatabaseEnv } from "./core/db.js";
 import { sessionUser } from "./auth/sessions.js";
 import { adminPlayerEntitlement } from "./admin/auth.js";
@@ -34,6 +36,26 @@ function emergencyAccountEnv(env) {
       return Reflect.has(target, prop);
     },
   });
+}
+
+function canonicalPublicRoute(request) {
+  const url = new URL(request.url), method = String(request.method || "GET").toUpperCase();
+  const originalPath = url.pathname;
+  if (method !== "GET" && method !== "HEAD") return { request, originalPath };
+  if (url.pathname === "/home/" || url.pathname === "/play/") {
+    return { redirect: Response.redirect(new URL(url.pathname === "/home/" ? "/home" : "/play", url), 308), originalPath };
+  }
+  if (url.pathname === "/") {
+    const target = new URL(url.searchParams.get("play") === "1" ? "/play" : "/home", url);
+    target.search = "";
+    return { redirect: Response.redirect(target, 308), originalPath };
+  }
+  if (url.pathname !== "/home" && url.pathname !== "/play") return { request, originalPath };
+  const internal = new URL(url);
+  internal.pathname = "/";
+  internal.searchParams.delete("play");
+  if (url.pathname === "/play") internal.searchParams.set("play", "1");
+  return { request: new Request(internal, request), originalPath: url.pathname };
 }
 
 async function authenticatedRoomIdentity(env, request) {
@@ -103,7 +125,6 @@ async function prepareAuthenticatedRoomRequest(request, env) {
   if (!identity) return request;
   const body = await request.clone().json().catch(() => null);
   if (!body || typeof body !== "object") return request;
-
   body.playerName = identity.name;
   body.returnPassword = "";
   if (enter) {
@@ -113,7 +134,6 @@ async function prepareAuthenticatedRoomRequest(request, env) {
       if (existing.name) body.playerName = existing.name;
     }
   }
-
   const headers = new Headers(request.headers);
   headers.delete("content-length");
   headers.set("content-type", "application/json");
@@ -138,12 +158,24 @@ export class GameRoom extends GameRoomV022 {
   }
 }
 
-async function improve(response) {
+function rewriteAdminPlayRedirect(response, context) {
+  if (context?.pathname !== "/admin/play" || response.status < 300 || response.status >= 400) return response;
+  const headers = new Headers(response.headers), location = headers.get("location");
+  if (!location) return response;
+  try { if (new URL(location, context.requestUrl).pathname !== "/") return response; }
+  catch { return response; }
+  headers.set("location", "/play");
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+async function improve(response, context = {}) {
+  response = rewriteAdminPlayRedirect(response, context);
   const type = String(response?.headers?.get("content-type") || "");
   if (!type.includes("text/html")) return response;
   let body = injectUrgentV023(await response.text());
   body = injectAuthenticatedRoomFields(body);
   body = injectRoomLiveFixes(body);
+  body = improveV023Html(body, context);
   const headers = new Headers(response.headers);
   headers.delete("content-length");
   headers.set("cache-control", "no-store");
@@ -153,8 +185,19 @@ async function improve(response) {
 
 export default {
   async fetch(request, env, ctx) {
-    const prepared = await prepareAuthenticatedRoomRequest(request, env);
-    return improve(await appV022.fetch(prepared, env, ctx));
+    const routed = canonicalPublicRoute(request);
+    if (routed.redirect) return routed.redirect;
+    const emergency = emergencyEnabled(env);
+    if (emergency) {
+      const adminRead = await emergencyAdminRead(routed.request, env);
+      if (adminRead) return adminRead;
+    }
+    const prepared = await prepareAuthenticatedRoomRequest(routed.request, env);
+    return improve(await appV022.fetch(prepared, env, ctx), {
+      pathname: routed.originalPath,
+      requestUrl: request.url,
+      emergencyAdmin: emergency,
+    });
   },
   scheduled(event, env, ctx) { return appV022.scheduled(event, env, ctx); },
 };
