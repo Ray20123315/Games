@@ -55,6 +55,29 @@ const NOTICE_HTML = `<div id="bvEmergencyNotice" role="dialog" aria-modal="true"
 
 const NOTICE_SCRIPT = `<script id="boardverse-emergency-notice-script">(function(){'use strict';var root=document.getElementById('bvEmergencyNotice');if(!root)return;var check=document.getElementById('bvEmergencyNoticeToday'),ok=root.querySelector('.bv-emergency-ok'),close=root.querySelector('.bv-emergency-close');function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}var key='boardverseEmergencyNoticeDismissed';function hide(){try{if(check&&check.checked)localStorage.setItem(key,today())}catch(e){}root.hidden=true}try{if(localStorage.getItem(key)!==today()){root.hidden=false;setTimeout(function(){if(ok)ok.focus()},0)}}catch(e){root.hidden=false}if(ok)ok.addEventListener('click',hide);if(close)close.addEventListener('click',hide);root.addEventListener('click',function(e){if(e.target===root)hide()});document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!root.hidden)hide()})})();</script>`;
 
+const MOBILE_ROOM_STYLE = `<style id="boardverse-mobile-room-layout-fix">
+@media(max-width:959px){
+body.room-mode{height:auto!important;min-height:100dvh!important;overflow-x:hidden!important;overflow-y:auto!important}
+body.room-mode .app-frame{height:auto!important;max-height:none!important;aspect-ratio:auto!important;overflow:visible!important;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))!important}
+body.room-mode .workspace,body.room-mode .room-layout,body.room-mode .room-main{height:auto!important;max-height:none!important;overflow:visible!important}
+body.room-mode .board-card{flex:0 0 auto!important;min-height:0!important;padding:6px!important}
+body.room-mode .board-stage{height:auto!important;min-height:0!important;max-height:none!important;overflow:visible!important;padding:6px!important;place-items:center!important}
+body.room-mode .board-fit{margin-inline:auto!important;max-width:100%!important;max-height:none!important}
+body.room-mode .banqi-board{aspect-ratio:2/1!important}
+body.room-mode .banqi-board .sq{aspect-ratio:auto!important;min-width:0!important;min-height:0!important}
+body.room-mode .side-stack{height:auto!important;max-height:none!important;overflow:visible!important;padding-bottom:calc(12px + env(safe-area-inset-bottom,0px))!important}
+body.room-mode .player-card,body.room-mode .player-card>div,body.room-mode .room-title,body.room-mode .status-card{min-width:0!important}
+body.room-mode .player-card strong,body.room-mode .player-card span,body.room-mode .room-title,body.room-mode .room-meta,body.room-mode .turn-banner,body.room-mode .role-line,body.room-mode .opening-box,body.room-mode .result-reason{white-space:normal!important;overflow-wrap:anywhere!important;word-break:break-word!important}
+}
+@media(max-width:560px){
+body.room-mode .board-card{padding:4px!important}
+body.room-mode .board-stage{padding:3px!important}
+body.room-mode .banqi-board{border-width:4px!important}
+body.room-mode .banqi-back{font-size:clamp(13px,5cqw,22px)!important}
+body.room-mode .banqi-board .xq-piece{font-size:clamp(13px,5cqw,24px)!important}
+}
+</style>`;
+
 function stripOldNotices(body) {
   return body
     .replace(/<div id="boardverse-do-quota-notice"[\s\S]*?<\/div>/gi, "")
@@ -92,6 +115,9 @@ async function improveHtml(response, forceEmergency = false) {
   if (!type.includes("text/html")) return response;
   let body = await response.text();
   body = patchHomeNavigation(body);
+  if (!body.includes("boardverse-mobile-room-layout-fix")) {
+    body = body.replace(/<\/head>/i, `${MOBILE_ROOM_STYLE}</head>`);
+  }
   const emergency = !!forceEmergency || response.headers.get("x-boardverse-emergency") === "d1" || body.includes("boardverse-emergency-d1-client");
   if (emergency) {
     body = stripOldNotices(body);
@@ -107,6 +133,7 @@ async function improveHtml(response, forceEmergency = false) {
   headers.delete("content-length");
   headers.set("cache-control", "no-store");
   headers.set("x-boardverse-history-fix", "root-does-not-resume-room");
+  headers.set("x-boardverse-mobile-room-layout", "content-sized-board-stage");
   if (emergency) headers.set("x-boardverse-emergency-notice", "modal");
   return new Response(body, { status: response.status, statusText: response.statusText, headers });
 }
