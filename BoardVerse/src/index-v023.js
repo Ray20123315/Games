@@ -1,6 +1,7 @@
 import appV022, { GameRoom as GameRoomV022 } from "./index-v022.js";
 import { injectUrgentV023 } from "./ui/urgent-v023.js";
 import { injectAuthenticatedRoomFields } from "./ui/authenticated-room-fields.js";
+import { injectRoomLiveFixes } from "./ui/room-live-fixes.js";
 import { ensureDbSchema, withDatabaseEnv } from "./core/db.js";
 import { sessionUser } from "./auth/sessions.js";
 import { adminPlayerEntitlement } from "./admin/auth.js";
@@ -142,6 +143,7 @@ async function improve(response) {
   if (!type.includes("text/html")) return response;
   let body = injectUrgentV023(await response.text());
   body = injectAuthenticatedRoomFields(body);
+  body = injectRoomLiveFixes(body);
   const headers = new Headers(response.headers);
   headers.delete("content-length");
   headers.set("cache-control", "no-store");
