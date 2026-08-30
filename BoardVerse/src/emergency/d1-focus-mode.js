@@ -3,6 +3,12 @@ import { ensureEmergencySchema } from "./d1-mode.js";
 
 const POLL_MS = 2000;
 const POLL_LOOPS = 8;
+const MUTATING_TYPES = new Set([
+  "move","pass","swap_sides","resign","ready","undo_request","undo_accept","undo_reject",
+  "rematch","rematch_request","rematch_accept","review_join","queue_move","queue_settings",
+  "room_chat_settings","chat","host_kick","qiguo_choose","opening_guess","opening_choose","opening_hand",
+  "focus_guard_settings","focus_violation",
+]);
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -116,18 +122,25 @@ export async function actionEmergencyFocus(db, roomId, request) {
   await ensureEmergencySchema(db);
   const body = await request.json().catch(() => ({}));
   const token = String(body.token || ""), message = body.message;
-  if (!message || !["focus_guard_settings", "focus_violation"].includes(String(message.type || ""))) {
-    return json({ ok: false, code: "bad_focus_message", message: "防切頁訊息格式錯誤。" }, 400);
+  if (!message || typeof message !== "object") {
+    return json({ ok: false, code: "bad_message", message: "訊息格式錯誤。" }, 400);
+  }
+  if (message.type === "voice_signal") {
+    return json({ ok: false, code: "emergency_voice_unavailable", message: "緊急 D1 模式暫不提供語音，文字聊天與棋局仍可使用。" }, 409);
   }
   const current = await loadRoom(db, roomId);
   if (!current) return json({ ok: false, code: "room_not_found", message: "房間已不存在。" }, 404);
   const engine = engineFor(current.room), messages = [], ws = captureSocket(token, messages);
   await engine.webSocketMessage(ws, JSON.stringify(message));
   const error = messages.find((item) => item?.type === "error");
-  if (error) return json({ ok: false, code: error.code || "focus_guard_failed", message: error.message || "防切頁操作失敗。", messages }, 400);
-  if (!(await updateRoom(db, roomId, current.revision, engine.room))) {
-    return json({ ok: false, code: "state_changed", message: "房間剛剛有變動，已重新同步。" }, 409);
+  if (error) return json({ ok: false, code: error.code || "room_action_failed", message: error.message || "操作失敗。", messages }, 400);
+
+  const mutates = MUTATING_TYPES.has(String(message.type || ""));
+  if (mutates) {
+    if (!(await updateRoom(db, roomId, current.revision, engine.room))) {
+      return json({ ok: false, code: "state_changed", message: "另一位玩家剛完成操作，棋盤已重新同步。" }, 409);
+    }
   }
   try { engine.sendState(ws); } catch {}
-  return json({ ok: true, revision: current.revision + 1, messages, emergency: true });
+  return json({ ok: true, revision: current.revision + (mutates ? 1 : 0), messages, emergency: true });
 }
