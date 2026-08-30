@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "boardverse-origin",
+  "main": "src/origin-v022.js",
+  "compatibility_date": "2026-08-28",
+  "workers_dev": true,
+  "keep_vars": true,
+  "d1_databases": [
+    {
+      "binding": "BOARDVERSE_DB",
+      "database_name": "boardverse-main",
+      "database_id": "REPLACE_WITH_NEW_ACCOUNT_D1_DATABASE_ID"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "GameRoom" },
+      { "name": "GLOBAL_CHAT", "class_name": "GlobalChat" }
+    ]
+  },
+  "exports": {
+    "GameRoom": { "type": "durable-object", "storage": "sqlite" },
+    "GlobalChat": { "type": "durable-object", "storage": "sqlite" }
+  },
+  "vars": {
+    "TURNSTILE_SITE_KEY": "0x4AAAAAAEgJg9Xf_BRP8k0b",
+    "TURNSTILE_HOSTNAMES": "xn--gmqt6w03b11v.ray2025.com,多人棋室.ray2025.com",
+    "BOARDVERSE_EMERGENCY_D1": "0"
+  }
+}
