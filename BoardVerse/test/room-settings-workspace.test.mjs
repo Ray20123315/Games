@@ -30,6 +30,8 @@ for (const marker of [
 for (const marker of ['voiceEnabled','voiceAvailable','voice_unavailable_emergency','voice_requires_two_players','targetQiguoCount','applyQiguoCapacity']) {
   assert.ok(serverV2.includes(marker), `server v2 missing ${marker}`);
 }
+assert.doesNotMatch(serverV2, /^import[^\n]*game-switch\.js/m, "settings module must remain importable by plain Node tests");
+assert.match(serverV2, /await import\("\.\/game-switch\.js"\)/, "Cloudflare game runtime must load only for an actual game switch");
 for (const marker of ['switchRoomGame','CurrentGameRoom','room.status === "playing"','room.gameId = gameId','room.currentReplay = null','resetReady(room, false)']) {
   assert.ok(gameSwitch.includes(marker), `game switch missing ${marker}`);
 }
