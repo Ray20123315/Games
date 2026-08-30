@@ -3,7 +3,7 @@ import { injectRoomWorkspace } from "./ui/room-workspace-ui.js";
 import { injectClockPresetAddon } from "./ui/room-clock-presets.js";
 import { injectAccountPresetAddon } from "./ui/room-account-presets.js";
 import { injectRuleSelectAddon } from "./ui/room-rule-selects.js";
-import { applyRoomSettings, emergencyRoomSettings, roomSettingsSnapshot } from "./room/settings-workspace.js";
+import { applyRoomSettings, emergencyRoomSettings, roomSettingsSnapshot } from "./room/settings-workspace-v2.js";
 import { errorJson, json } from "./core/http.js";
 
 export * from "./index-v021.js";
