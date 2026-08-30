@@ -30,9 +30,9 @@ assert.match(buildGate, /"wrangler",\s*"deploy",\s*"--dry-run"/s);
 
 const v022 = await readFile(new URL("../src/index-v022.js", import.meta.url), "utf8");
 for (const x of [
-  './index-v021.js','./room/settings-workspace.js','./ui/room-workspace-ui.js','./ui/room-clock-presets.js',
-  './ui/room-account-presets.js','./ui/room-rule-selects.js','SETTINGS_RE','/feature/room-settings',
-  'await applyRoomSettings','injectRoomWorkspace','injectClockPresetAddon','injectAccountPresetAddon','injectRuleSelectAddon',
+  './index-v021.js','./room/settings-workspace-v2.js','./ui/room-workspace-ui.js','./ui/room-clock-presets.js',
+  './ui/room-account-presets.js','./ui/room-rule-selects.js','./ui/room-voice-settings.js','SETTINGS_RE','/feature/room-settings',
+  'await applyRoomSettings','injectRoomWorkspace','injectClockPresetAddon','injectAccountPresetAddon','injectRuleSelectAddon','injectVoiceSettingsAddon',
 ]) assert.ok(v022.includes(x), `v022 missing ${x}`);
 
 const v021 = await readFile(new URL("../src/index-v021.js", import.meta.url), "utf8");
