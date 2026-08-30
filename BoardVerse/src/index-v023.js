@@ -1,7 +1,7 @@
 import appV022, { GameRoom as GameRoomV022 } from "./index-v022.js";
 import { injectUrgentV023 } from "./ui/urgent-v023.js";
 import { injectAuthenticatedRoomFields } from "./ui/authenticated-room-fields.js";
-import { withDatabaseEnv } from "./core/db.js";
+import { ensureDbSchema, withDatabaseEnv } from "./core/db.js";
 import { sessionUser } from "./auth/sessions.js";
 import { adminPlayerEntitlement } from "./admin/auth.js";
 import { ensureFeatureState } from "./room/state.js";
@@ -40,6 +40,7 @@ async function authenticatedRoomIdentity(env, request) {
   const db = effectiveEnv?.BOARDVERSE_DB || null;
   if (db) {
     try {
+      await ensureDbSchema(db);
       const user = await sessionUser(db, request);
       if (user?.id) {
         const name = String(user.username_display || user.username || "").normalize("NFKC").trim().slice(0, 40);
