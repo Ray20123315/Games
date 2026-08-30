@@ -1,5 +1,5 @@
 import appV021 from "./index-v021.js";
-import { RoomSettingsGameRoom } from "./room/settings-room.js";
+import { RoomSettingsGameRoom } from "./room/settings-room-safe.js";
 import { injectRoomSettingsUi } from "./ui/room-settings.js";
 import { injectRoomReplayLayout } from "./ui/room-replay-layout.js";
 
