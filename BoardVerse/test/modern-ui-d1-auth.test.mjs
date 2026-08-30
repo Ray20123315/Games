@@ -36,7 +36,8 @@ assert.match(v020, /if \(key === "BOARDVERSE_DB"\) return target\.BOARDVERSE_D1/
 assert.match(v020, /if \(key === "BOARDVERSE_DB_DO"\) return undefined/);
 assert.match(v020, /pathname\.startsWith\("\/admin\/"\)/);
 
-for (const marker of ['bvAuthErrorOverlay','bvAuthErrorDialog','bvAuthErrorMessage','AUTH_FORM_RE','hookAuthForms','showAuthError','new FormData(form)']) {
+for (const marker of [
+  'bvAuthErrorOverlay','bvAuthErrorDialog','bvAuthErrorMessage','AUTH_FORM_RE','hookAuthForms','showAuthError','new FormData(form)']) {
   assert.ok(urgent.includes(marker), `v023 custom auth error modal missing ${marker}`);
 }
 assert.match(urgent, /\/\(\?:login\|register\|resend-verification\|forgot\|reset\|activate\)/);
@@ -87,7 +88,7 @@ assert.match(originConfig, /"GLOBAL_CHAT"\s*,\s*"class_name"\s*:\s*"GlobalChat"/
 assert.match(originConfig, /REPLACE_WITH_NEW_ACCOUNT_D1_DATABASE_ID/);
 assert.match(edgeConfig, /xn--gmqt6w03b11v\.ray2025\.com/);
 assert.match(edgeConfig, /REPLACE_WITH_NEW_ACCOUNT_SUBDOMAIN/);
-assert.match(production, /"main"\s*:\s*"src\/index-v023\.js"/);
+assert.match(production, /"main"\s*:\s*"src\/index-v024\.js"/);
 assert.match(v023, /from "\.\/index-v022\.js"/);
 assert.match(v022, /from "\.\/index-v021\.js"/);
 assert.match(production, /"database_name"\s*:\s*"games-boardverse-recovery-20260830-v2"/);
