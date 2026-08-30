@@ -40,10 +40,12 @@ async function publicSettingsEndpoint(request, env, roomId) {
   }
   const stub = roomStub(env?.ROOMS, roomId);
   if (!stub) return errorJson("房間服務暫時不可用。", 503, "room_binding_missing");
-  return stub.fetch(new Request("https://boardverse.internal/feature/room-settings", {
+  const internalUrl = new URL("https://boardverse.internal/feature/room-settings");
+  if (request.method === "GET") internalUrl.searchParams.set("token", token);
+  return stub.fetch(new Request(internalUrl, {
     method: request.method,
     headers: { "content-type": "application/json" },
-    body: request.method === "POST" ? JSON.stringify({ token, input }) : JSON.stringify({ token }),
+    body: request.method === "POST" ? JSON.stringify({ token, input }) : undefined,
   }));
 }
 
@@ -53,14 +55,13 @@ export class GameRoom extends GameRoomV021 {
     if (url.pathname === "/feature/room-settings" && (request.method === "GET" || request.method === "POST")) {
       await this.loadRoom();
       if (!this.room) return errorJson("找不到此房間。", 404, "room_not_found");
-      const body = await request.json().catch(() => ({}));
-      const token = String(body.token || "");
       if (request.method === "GET") {
-        const settings = roomSettingsSnapshot(this.room, token);
+        const settings = roomSettingsSnapshot(this.room, String(url.searchParams.get("token") || ""));
         return settings ? json({ ok: true, settings }) : errorJson("只有房主可以修改房間設定。", 403, "owner_required");
       }
+      const body = await request.json().catch(() => ({}));
       try {
-        const settings = applyRoomSettings(this.room, token, body.input || {});
+        const settings = applyRoomSettings(this.room, String(body.token || ""), body.input || {});
         await this.saveRoom();
         await this.syncLobby();
         await this.broadcastState();
