@@ -1,0 +1,11 @@
+export const ROOM_VOICE_SETTINGS_SCRIPT = String.raw`<script id="boardverse-room-voice-settings">(function(){
+'use strict';if(window.__BOARDVERSE_ROOM_VOICE_SETTINGS__)return;window.__BOARDVERSE_ROOM_VOICE_SETTINGS__=true;
+var latest=null,nativeFetch=window.fetch.bind(window);
+function byId(id){return document.getElementById(id)}
+function isSettingsUrl(input){try{var u=typeof input==='string'?input:(input&&input.url)||'';return /^\/api\/rooms\/[A-Z2-9]{6}\/settings(?:\?|$)/.test(new URL(u,location.href).pathname+new URL(u,location.href).search)}catch(_){return false}}
+function capture(response){try{response.clone().json().then(function(d){if(d&&d.settings){latest=d.settings;setTimeout(mount,0)}}).catch(function(){})}catch(_){}return response}
+window.fetch=function(input,init){var target=isSettingsUrl(input),next=init;if(target&&init&&String(init.method||'GET').toUpperCase()==='POST'&&init.body){try{var body=JSON.parse(init.body),voice=byId('bvRsVoice');if(voice)body.voiceEnabled=!!voice.checked;next=Object.assign({},init,{body:JSON.stringify(body)})}catch(_){}}var p=nativeFetch(input,next);return target?p.then(capture):p};
+function mount(){var focus=byId('bvRsFocus'),grid=focus&&focus.closest('.bv-rs-grid');if(!grid||byId('bvRsVoice'))return;var label=document.createElement('label');label.className='bv-rs-check';var disabled=!latest||latest.voiceAvailable===false||latest.editableCore===false;label.innerHTML='<input id="bvRsVoice" type="checkbox" '+(latest&&latest.voiceEnabled?'checked':'')+' '+(disabled?'disabled':'')+'><span>1v1 P2P 對手語音</span>';var note=document.createElement('div');note.className='bv-rs-note';note.id='bvRsVoiceNote';note.textContent=latest&&latest.voiceAvailable===false?'緊急 D1／七國模式不提供 P2P 語音。':'開啟語音前需清空排隊與觀眾；語音房不提供觀戰。';grid.appendChild(label);grid.appendChild(note)}
+new MutationObserver(mount).observe(document.documentElement,{childList:true,subtree:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',mount,{once:true});else mount();
+})();</script>`;
+export function injectVoiceSettingsAddon(body){const html=String(body||'');return html.includes('boardverse-room-voice-settings')?html:html.replace(/<\/body>/i,`${ROOM_VOICE_SETTINGS_SCRIPT}</body>`)}
