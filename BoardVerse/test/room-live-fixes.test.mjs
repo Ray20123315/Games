@@ -4,20 +4,40 @@ import vm from "node:vm";
 import { injectRoomLiveFixes } from "../src/ui/room-live-fixes.js";
 
 const source = await readFile(new URL("../src/ui/room-live-fixes.js", import.meta.url), "utf8");
+const authRoomUi = await readFile(new URL("../src/ui/authenticated-room-fields.js", import.meta.url), "utf8");
 
 for (const marker of [
   "#bvFeatureControls.bv-room-action-strip",
   "flex-wrap:wrap!important",
   "overflow:visible!important",
   "white-space:normal!important",
+  "#bvFocusGuardButton{display:none!important}",
+  "bvCreateFocusGuard",
+  "bvCreateFocusGuardAllowed",
+  "允許離開次數",
+  "0 = 第一次離開就判負",
+  "createRoomRequest",
+  "u.pathname==='/api/rooms'",
+  "/settings?token=",
+  "focusGuardEnabled:config.enabled",
+  "focusGuardAllowedLeaves:config.allowedLeaves",
+  "cleanupSettingsWorkspace",
+  "intro.remove()",
   "syncSettingsGameSelector",
   "feature.status==='playing'",
   "對局進行中不可切換棋類；本局結束後可直接在原房切換。",
   "切換棋類會保留房號、成員、聊天與歷史回放",
 ]) assert.ok(source.includes(marker), `room live fix missing ${marker}`);
 
+for (const marker of [
+  "bv-authenticated-room-password-field",
+  ".field,.bv-rs-field",
+  "syncPassword('bvRsReturnPassword',on)",
+]) assert.ok(authRoomUi.includes(marker), `authenticated room settings cleanup missing ${marker}`);
+
 assert.doesNotMatch(source, /#bvFeatureControls\.bv-room-action-strip\{[^}]*overflow-x:auto/i, "room action strip must not reintroduce horizontal scrolling");
 assert.doesNotMatch(source, /#bvFeatureControls\.bv-room-action-strip\{[^}]*flex-wrap:nowrap/i, "room action strip must wrap instead of forcing one line");
+assert.doesNotMatch(authRoomUi, /window\.alert\(/, "authenticated room field handling must not use native alerts");
 
 const scriptStart = source.indexOf('export const ROOM_LIVE_FIXES_SCRIPT = String.raw`<script');
 assert.ok(scriptStart >= 0, "room live fixes inline script missing");
@@ -25,6 +45,13 @@ const bodyStart = source.indexOf('>', scriptStart) + 1;
 const bodyEnd = source.indexOf('</script>`;', bodyStart);
 assert.ok(bodyStart > scriptStart && bodyEnd > bodyStart, "room live fixes script boundary invalid");
 new vm.Script(source.slice(bodyStart, bodyEnd), { filename: "room-live-fixes.js" });
+
+const authScriptStart = authRoomUi.indexOf('<script id="boardverse-authenticated-room-fields">');
+assert.ok(authScriptStart >= 0, "authenticated room fields inline script missing");
+const authBodyStart = authRoomUi.indexOf('>', authScriptStart) + 1;
+const authBodyEnd = authRoomUi.indexOf('</script>`;', authBodyStart);
+assert.ok(authBodyStart > authScriptStart && authBodyEnd > authBodyStart, "authenticated room fields script boundary invalid");
+new vm.Script(authRoomUi.slice(authBodyStart, authBodyEnd), { filename: "authenticated-room-fields.js" });
 
 const html = "<!doctype html><html><head></head><body><main>BoardVerse</main></body></html>";
 const once = injectRoomLiveFixes(html);
