@@ -17,7 +17,8 @@ function restoreOriginalRequest(request, env) {
   headers.delete("x-boardverse-edge-secret");
   headers.delete("x-boardverse-original-origin");
   headers.delete("x-boardverse-original-host");
-  return new Request(restored, request, { headers });
+  const forwarded = new Request(restored, request);
+  return new Request(forwarded, { headers });
 }
 
 export default {
