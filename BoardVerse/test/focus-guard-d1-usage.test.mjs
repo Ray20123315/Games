@@ -3,11 +3,13 @@ import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 
 const entry = await readFile(new URL("../src/index-v021.js", import.meta.url), "utf8");
+const wrapper = await readFile(new URL("../src/index-v022.js", import.meta.url), "utf8");
 const room = await readFile(new URL("../src/room/focus-guard-room.js", import.meta.url), "utf8");
 const emergency = await readFile(new URL("../src/emergency/d1-focus-mode.js", import.meta.url), "utf8");
 const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 
-assert.match(wrangler, /"main"\s*:\s*"src\/index-v021\.js"/);
+assert.match(wrangler, /"main"\s*:\s*"src\/index-v022\.js"/);
+assert.match(wrapper, /from "\.\/index-v021\.js"/);
 assert.match(entry, /export \{ FocusGuardGameRoom as GameRoom \}/);
 assert.match(entry, /FOCUS_REPORT_RE/);
 assert.match(entry, /keepalive:true/);
@@ -43,9 +45,10 @@ assert.match(room, /focusGuardEnabled = feature\.focusGuardEnabled !== false/);
 
 assert.match(emergency, /const POLL_MS = 2000/);
 assert.match(emergency, /const POLL_LOOPS = 8/);
-assert.match(emergency, /Object\.create\(FocusGuardGameRoom\.prototype\)/);
+assert.match(emergency, /Object\.create\(RoomSettingsGameRoom\.prototype\)/);
 assert.match(emergency, /focus_guard_settings/);
 assert.match(emergency, /focus_violation/);
+assert.match(emergency, /room_settings_update/);
 assert.match(emergency, /WHERE room_id=\? AND revision=\?/);
 
 const start = entry.indexOf('const FOCUS_SCRIPT = String.raw`<script');
