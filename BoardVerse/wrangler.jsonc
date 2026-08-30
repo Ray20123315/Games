@@ -1,8 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "games",
-  // Previous compatibility layer marker for legacy regression coverage: "main": "src/index-v017.js"
-  "main": "src/index-v018.js",
+  "main": "src/index-v019.js",
   "compatibility_date": "2026-08-28",
   "workers_dev": false,
   "keep_vars": true,
@@ -11,6 +10,9 @@
       "pattern": "xn--gmqt6w03b11v.ray2025.com",
       "custom_domain": true
     }
+  ],
+  "d1_databases": [
+    { "binding": "BOARDVERSE_D1" }
   ],
   "durable_objects": {
     "bindings": [
@@ -26,6 +28,8 @@
   },
   "vars": {
     "TURNSTILE_SITE_KEY": "0x4AAAAAAEgJg9Xf_BRP8k0b",
-    "TURNSTILE_HOSTNAMES": "xn--gmqt6w03b11v.ray2025.com,多人棋室.ray2025.com"
+    "TURNSTILE_HOSTNAMES": "xn--gmqt6w03b11v.ray2025.com,多人棋室.ray2025.com",
+    "BOARDVERSE_EMERGENCY_D1": "1",
+    "BOARDVERSE_EMERGENCY_UNTIL": "2026-08-31T00:10:00Z"
   }
 }
