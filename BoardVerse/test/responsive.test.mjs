@@ -18,4 +18,15 @@ assert.ok(SITE_I18N_SCRIPT.indexOf('id="boardverse-responsive"') < SITE_I18N_SCR
 const entry = await readFile(new URL("../src/index-v011.js", import.meta.url), "utf8");
 assert.match(entry, /SITE_I18N_SCRIPT/);
 assert.match(entry, /injectSiteScripts/);
+
+const mobileFix = await readFile(new URL("../src/index-v020.js", import.meta.url), "utf8");
+assert.match(mobileFix, /id="boardverse-mobile-room-layout-fix"/);
+assert.match(mobileFix, /body\.room-mode \.board-stage\{height:auto!important;min-height:0!important;max-height:none!important/);
+assert.match(mobileFix, /body\.room-mode \.board-card\{flex:0 0 auto!important/);
+assert.match(mobileFix, /body\.room-mode \.banqi-board\{aspect-ratio:2\/1!important/);
+assert.match(mobileFix, /body\.room-mode \.banqi-board \.sq\{aspect-ratio:auto!important/);
+assert.match(mobileFix, /safe-area-inset-bottom/);
+assert.match(mobileFix, /overflow-wrap:anywhere!important/);
+assert.match(mobileFix, /x-boardverse-mobile-room-layout/);
+
 console.log("responsive.test: PASS");
