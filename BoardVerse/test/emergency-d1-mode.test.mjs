@@ -3,12 +3,12 @@ import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 
 const entry = await readFile(new URL("../src/index-v019.js", import.meta.url), "utf8");
-const production = await readFile(new URL("../src/index-v022.js", import.meta.url), "utf8");
+const production = await readFile(new URL("../src/index-v023.js", import.meta.url), "utf8");
 const backend = await readFile(new URL("../src/emergency/d1-mode.js", import.meta.url), "utf8");
 const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 
-assert.match(wrangler, /"main"\s*:\s*"src\/index-v022\.js"/);
-assert.match(production, /from "\.\/index-v021\.js"/);
+assert.match(wrangler, /"main"\s*:\s*"src\/index-v023\.js"/);
+assert.match(production, /from "\.\/index-v022\.js"/);
 assert.match(wrangler, /"d1_databases"\s*:/);
 assert.match(wrangler, /"binding"\s*:\s*"BOARDVERSE_D1"/);
 assert.doesNotMatch(wrangler, /"database_id"\s*:/, "emergency D1 must use Wrangler automatic provisioning rather than a fake resource id");
