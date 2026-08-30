@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("../src/index-v013.js", import.meta.url), "utf8");
-const production = fs.readFileSync(new URL("../src/index-v022.js", import.meta.url), "utf8");
+const production = fs.readFileSync(new URL("../src/index-v023.js", import.meta.url), "utf8");
 const wrangler = fs.readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 
 test("host kick panel is relocated into the scrollable room sidebar", () => {
@@ -24,7 +24,7 @@ test("OWNER account HTML masks the synthetic admin bridge email", () => {
   assert.match(source, /內部管理帳號/);
 });
 
-test("deployment wraps v021 with v022 room workspace", () => {
-  assert.match(wrangler, /"main": "src\/index-v022\.js"/);
-  assert.match(production, /from "\.\/index-v021\.js"/);
+test("deployment wraps v022 with v023 urgent repair layer", () => {
+  assert.match(wrangler, /"main": "src\/index-v023\.js"/);
+  assert.match(production, /from "\.\/index-v022\.js"/);
 });
