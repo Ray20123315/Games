@@ -1,5 +1,6 @@
 import appV021, { GameRoom as GameRoomV021 } from "./index-v021.js";
 import { injectRoomWorkspace } from "./ui/room-workspace-ui.js";
+import { injectClockPresetAddon } from "./ui/room-clock-presets.js";
 import { applyRoomSettings, emergencyRoomSettings, roomSettingsSnapshot } from "./room/settings-workspace.js";
 import { errorJson, json } from "./core/http.js";
 
@@ -21,7 +22,7 @@ function roomStub(namespace, roomId) {
 async function injectHtml(response) {
   const type = String(response?.headers?.get("content-type") || "");
   if (!type.includes("text/html")) return response;
-  const body = injectRoomWorkspace(await response.text());
+  const body = injectClockPresetAddon(injectRoomWorkspace(await response.text()));
   const headers = new Headers(response.headers);
   headers.delete("content-length");
   headers.set("cache-control", "no-store");
