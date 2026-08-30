@@ -36,8 +36,7 @@ assert.match(v020, /if \(key === "BOARDVERSE_DB"\) return target\.BOARDVERSE_D1/
 assert.match(v020, /if \(key === "BOARDVERSE_DB_DO"\) return undefined/);
 assert.match(v020, /pathname\.startsWith\("\/admin\/"\)/);
 
-for (const marker of [
-  'bvAuthErrorOverlay','bvAuthErrorDialog','bvAuthErrorMessage','AUTH_FORM_RE','hookAuthForms','showAuthError','new FormData(form)']) {
+for (const marker of ['bvAuthErrorOverlay','bvAuthErrorDialog','bvAuthErrorMessage','AUTH_FORM_RE','hookAuthForms','showAuthError','new FormData(form)']) {
   assert.ok(urgent.includes(marker), `v023 custom auth error modal missing ${marker}`);
 }
 assert.match(urgent, /\/\(\?:login\|register\|resend-verification\|forgot\|reset\|activate\)/);
