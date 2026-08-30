@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 
 const wr = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 assert.match(wr, /"name"\s*:\s*"games"/);
-assert.match(wr, /"main"\s*:\s*"src\/index-v019\.js"/);
+assert.match(wr, /"main"\s*:\s*"src\/index-v020\.js"/);
 assert.doesNotMatch(wr, /"build"\s*:/);
 assert.doesNotMatch(wr, /xn--gmqt6w03b11v\.ray2025\.com\/\*/);
 assert.match(wr, /"pattern"\s*:\s*"xn--gmqt6w03b11v\.ray2025\.com"/);
@@ -27,6 +27,12 @@ assert.match(buildGate, /targetWorker = "games"/);
 assert.match(buildGate, /WRANGLER_CI_OVERRIDE_NAME/);
 assert.match(buildGate, /"npm", \["test"\]/);
 assert.match(buildGate, /"wrangler",\s*"deploy",\s*"--dry-run"/s);
+
+const v020 = await readFile(new URL("../src/index-v020.js", import.meta.url), "utf8");
+for (const x of [
+  './index-v019.js','pollEmergencyGlobalLite','boardverseEmergencyNoticeDismissed','今天不再顯示',
+  'stripOldNotices','patchHomeNavigation','root-does-not-resume-room','document.visibilityState',
+]) assert.ok(v020.includes(x), `v020 missing ${x}`);
 
 const v019 = await readFile(new URL("../src/index-v019.js", import.meta.url), "utf8");
 for (const x of [
