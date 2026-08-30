@@ -7,6 +7,7 @@ var MAP={
  boardSize:{gomoku:[[15,'15×15'],[19,'19×19']],reversi:[[6,'6×6'],[8,'8×8 標準'],[10,'10×10 Grand']]},
  opening:{gomoku:[['none','無限制'],['pro','Pro 開局'],['swap','Swap 交換持色']],renju:[['free','自由開局']]},
  objective:{reversi:[['normal','標準：棋子多者勝'],['misere','Anti-Othello：棋子少者勝']]},
+ playerCount:{qiguo:[[3,'3 人'],[4,'4 人'],[5,'5 人'],[6,'6 人'],[7,'7 人']]},
  drawMode:{qiguo:[['country','抽國家／聯盟'],['number','抽 1～N 號後依序選國']]}
 };
 function enhance(){var g=gameId();document.querySelectorAll('#bvRsRules [data-rule]').forEach(function(old){var key=old.getAttribute('data-rule'),opts=MAP[key]&&MAP[key][g];if(!opts||old.tagName==='SELECT')return;var s=document.createElement('select');s.setAttribute('data-rule',key);s.disabled=old.disabled;opts.forEach(function(o){var x=document.createElement('option');x.value=String(o[0]);x.textContent=String(o[1]);s.appendChild(x)});s.value=String(old.value);old.replaceWith(s)})}
