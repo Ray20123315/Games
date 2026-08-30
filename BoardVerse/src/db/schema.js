@@ -1,5 +1,4 @@
-export const BOARDVERSE_SCHEMA_SQL = String.raw`PRAGMA foreign_keys = ON;
-CREATE TABLE IF NOT EXISTS users (
+export const BOARDVERSE_SCHEMA_SQL = String.raw`CREATE TABLE IF NOT EXISTS users (
  id TEXT PRIMARY KEY, username_normalized TEXT NOT NULL UNIQUE, username_display TEXT NOT NULL,
  email_normalized TEXT NOT NULL UNIQUE, email_verified_at INTEGER,
  password_algorithm TEXT NOT NULL, password_iterations INTEGER NOT NULL, password_salt TEXT, password_hash TEXT,
@@ -34,7 +33,7 @@ CREATE TABLE IF NOT EXISTS opponent_daily_gp (
  gp_eligible_games INTEGER NOT NULL DEFAULT 0, total_games INTEGER NOT NULL DEFAULT 0, PRIMARY KEY(user_id,opponent_user_id,date_key)
 );
 CREATE TABLE IF NOT EXISTS gp_events (
- id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, amount INTEGER NOT NULL, reason TEXT NOT NULL, created_at INTEGER NOT NULL
+ id TEXT PRIMARY KEY, user_id TEXT NOT NULL, amount INTEGER NOT NULL, reason TEXT NOT NULL, created_at INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_gp_events_user ON gp_events(user_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS room_presets (
