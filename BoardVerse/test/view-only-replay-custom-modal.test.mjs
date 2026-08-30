@@ -11,21 +11,10 @@ const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "
 
 for (const marker of [
   'import appV015, { GameRoom as GameRoomBase } from "./index-v015.js"',
-  'replayInterruptions',
-  'player_disconnected',
-  'player_reconnected',
-  'interruptions',
-  'boardverse-room-replay-player-style',
-  'boardverse-room-replay-player',
-  'bvReplayPlay',
-  'bvReplaySpeed',
-  'bvReplayThinking',
-  'bvReplaySkipDisconnect',
-  'bvReplayZoom',
-  'bvReplayExpand',
-  'boardverse:room-replay-frame',
-  'boardverse-admin-readable-replay',
-  '房號','棋類','對局者','勝者','結果','公開至','保存狀態','查看',
+  'replayInterruptions','player_disconnected','player_reconnected','interruptions',
+  'boardverse-room-replay-player-style','boardverse-room-replay-player','bvReplayPlay','bvReplaySpeed',
+  'bvReplayThinking','bvReplaySkipDisconnect','bvReplayZoom','bvReplayExpand','boardverse:room-replay-frame',
+  'boardverse-admin-readable-replay','房號','棋類','對局者','勝者','結果','公開至','保存狀態','查看',
 ]) assert.ok(source.includes(marker), `missing v016 marker: ${marker}`);
 
 assert.match(source, /async sendReplay\(ws, token, replayId\)/);
@@ -68,6 +57,6 @@ assert.match(v014, /boardverse-unified-modal/);
 assert.match(v014, /window\.alert=function/);
 assert.match(v014, /window\.prompt=function/);
 assert.match(v014, /window\.confirm=function/);
-assert.match(wrangler, /"main": "src\/index-v017\.js"/);
+assert.match(wrangler, /"main": "src\/index-v019\.js"/);
 
 console.log("view-only-replay-custom-modal.test: PASS (readable admin replays + enhanced room replay player)");

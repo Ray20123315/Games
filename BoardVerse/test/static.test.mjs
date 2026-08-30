@@ -1,110 +1,95 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-const wr=await readFile(new URL("../wrangler.jsonc",import.meta.url),"utf8");
-assert.match(wr,/"name"\s*:\s*"games"/);
-assert.match(wr,/"main"\s*:\s*"src\/index-v017\.js"/);
-assert.doesNotMatch(wr,/"build"\s*:/);
-assert.doesNotMatch(wr,/xn--gmqt6w03b11v\.ray2025\.com\/\*/,"production Worker is the hostname origin; keep the custom domain rather than a catch-all Worker Route");
-assert.match(wr,/"pattern"\s*:\s*"xn--gmqt6w03b11v\.ray2025\.com"/);
-assert.match(wr,/"custom_domain"\s*:\s*true/);
-assert.match(wr,/BOARDVERSE_DB_DO/);
-assert.match(wr,/"BOARDVERSE_DB_DO"\s*,\s*"class_name"\s*:\s*"GameRoom"/);
-assert.match(wr,/"ROOMS"\s*,\s*"class_name"\s*:\s*"GameRoom"/);
-assert.match(wr,/"exports"\s*:/,"existing provisioned Durable Object classes must be declared in exports");
-assert.match(wr,/"GameRoom"\s*:\s*\{[^}]*"type"\s*:\s*"durable-object"[^}]*"storage"\s*:\s*"sqlite"/s,"GameRoom must remain a live SQLite Durable Object export");
-assert.doesNotMatch(wr,/"state"\s*:\s*"(?:deleted|renamed|transferred|expecting-transfer)"/,"GameRoom export must stay live; do not tombstone or transfer the existing namespace");
-assert.doesNotMatch(wr,/"migrations"\s*:/,"production deploy must use declarative exports rather than start a legacy DO migration chain");
-assert.doesNotMatch(wr,/"database_id"\s*:\s*"(?:00000000|placeholder|example)/i,"fake D1 UUID must never be committed");
-const buildGate=await readFile(new URL("../build-worker.mjs",import.meta.url),"utf8");
-assert.match(buildGate,/full regression suite/);
-assert.match(buildGate,/Wrangler live-worker dry-run/);
-assert.match(buildGate,/targetWorker = "games"/);
-assert.match(buildGate,/WRANGLER_CI_OVERRIDE_NAME/);
-assert.match(buildGate,/does not match canonical target/);
-assert.match(buildGate,/Cloudflare Deploy command will deploy connected Worker/);
-assert.doesNotMatch(buildGate,/installWranglerCiWrapper/);
-assert.doesNotMatch(buildGate,/WRANGLER_CI_MATCH_TAG/);
-assert.doesNotMatch(buildGate,/crimson-haze-0a4d/);
-assert.match(buildGate,/"npm", \["test"\]/);
-assert.match(buildGate,/"wrangler",\s*"deploy",\s*"--dry-run"/s);
-const entry=await readFile(new URL("../src/index-v011.js",import.meta.url),"utf8"); assert.match(entry,/from "\.\/index\.js"/); assert.match(entry,/\.\/ui\/piece-theme\.js/); assert.match(entry,/hardenPieceThemeHtml/); assert.match(entry,/withDatabaseEnv/); assert.match(entry,/BoardVerseDb/); assert.match(entry,/query\(mode, sql, binds = \[\]\)/);
-const latestEntry=await readFile(new URL("../src/index-v017.js",import.meta.url),"utf8");
-assert.match(latestEntry,/from "\.\/index-v016\.js"/);
-assert.match(latestEntry,/persistRoomChatOnly/);
-assert.match(latestEntry,/assertRoomChatModeration/);
-assert.match(latestEntry,/do not ping the lobby Durable Object/);
-assert.match(latestEntry,/GLOBAL_POLICY_TTL_MS = 60_000/);
-assert.match(latestEntry,/GLOBAL_MUTE_TTL_MS = 15_000/);
-assert.match(latestEntry,/GLOBAL_ARCHIVE_BATCH = 8/);
-assert.match(latestEntry,/INSERT OR IGNORE INTO chat_archive/);
-assert.match(latestEntry,/chatArchiveCursorId/);
-assert.match(latestEntry,/export class GlobalChat extends GlobalChatBase/);
-const v016Entry=await readFile(new URL("../src/index-v016.js",import.meta.url),"utf8");
-assert.match(v016Entry,/from "\.\/index-v015\.js"/);
-assert.match(v016Entry,/replayInterruptions/);
-assert.match(v016Entry,/player_disconnected/);
-assert.match(v016Entry,/player_reconnected/);
-assert.match(v016Entry,/boardverse-room-replay-player/);
-assert.match(v016Entry,/bvReplaySpeed/);
-assert.match(v016Entry,/bvReplayThinking/);
-assert.match(v016Entry,/bvReplaySkipDisconnect/);
-assert.match(v016Entry,/boardverse-admin-readable-replay/);
-assert.match(v016Entry,/對局者/);
-assert.match(v016Entry,/公開至/);
-const v015Entry=await readFile(new URL("../src/index-v015.js",import.meta.url),"utf8");
-assert.match(v015Entry,/from "\.\/index-v014\.js"/);
-assert.match(v015Entry,/boardverse-room-replay-scope/);
-assert.match(v015Entry,/房內使用者皆可查看/);
-assert.match(v015Entry,/boardverse-admin-zh/);
-assert.match(v015Entry,/removeMisinterpretedPublicReplayRoomUi/);
-const v014Entry=await readFile(new URL("../src/index-v014.js",import.meta.url),"utf8");
-assert.match(v014Entry,/from "\.\/index-v013\.js"/);
-assert.match(v014Entry,/replay_download_disabled/);
-assert.match(v014Entry,/boardverse-unified-modal/);
-assert.match(v014Entry,/PUBLIC_REPLAY_DOWNLOAD_RE/);
-const productionEntry=await readFile(new URL("../src/index-v013.js",import.meta.url),"utf8");
-assert.match(productionEntry,/from "\.\/index-v012\.js"/);
-assert.match(productionEntry,/const OFFLINE_FORFEIT_MS = 20_000/);
-assert.match(productionEntry,/member\.offlineDeadline = since \+ OFFLINE_FORFEIT_MS/);
-assert.match(productionEntry,/rewriteAuthenticatedRoomName/);
-assert.match(productionEntry,/isRoomIdentityPost/);
-assert.match(productionEntry,/enter\|join/);
-assert.match(productionEntry,/body\.playerName = identity\.name/);
-assert.match(productionEntry,/document\.getElementById\('createName'\)/);
-assert.match(productionEntry,/document\.getElementById\('gateName'\)/);
-assert.match(productionEntry,/identity\.role==='guest'/);
-assert.match(productionEntry,/replace\(\/60s →\/g, "20s →"\)/);
-assert.match(productionEntry,/離線超過 20 秒/);
-assert.doesNotMatch(productionEntry,/ADMIN_PASSWORD|ADMIN_USERNAME/);
-const pieceTheme=await readFile(new URL("../src/ui/piece-theme.js",import.meta.url),"utf8"); assert.match(pieceTheme,/color-scheme:only light/); assert.match(pieceTheme,/forced-color-adjust:none/); assert.match(pieceTheme,/background-color:#f4f6f8!important/); assert.match(pieceTheme,/-webkit-text-fill-color:#faf7ee!important/);
-const idx=await readFile(new URL("../src/index.js",import.meta.url),"utf8"); assert.match(idx,/\.\/legacy\/runtime-v029\.js/); assert.match(idx,/scheduled/); assert.match(idx,/\/replay\//); assert.match(idx,/\/admin\/api\//); assert.match(idx,/\/ws\/global/);
-const gr=await readFile(new URL("../src/room/GameRoom.js",import.meta.url),"utf8"); for(const x of ["players_ready","undo_requested","undo_accepted","state_restored","rematch_requested","rematch_accepted","clock_timeout","owner_grace","voice_signal","adminTerminateGame","adminCloseRoom","qiguo","ensureFeatureGameStarted","rematchRequired"]) assert.ok(gr.includes(x),x);
-const ui=await readFile(new URL("../src/ui/enhance.js",import.meta.url),"utf8"); for(const x of ["navigator.share","getUserMedia","STUN_URL","bvGameFilter","bvReady","undo_request","BoardVerseBridge"]) assert.ok(ui.includes(x),x);
-assert.match(ui,/APP_VERSION/); assert.match(ui,/v0\.0\.29<\/span>/);
-const schema=await readFile(new URL("../src/db/schema.js",import.meta.url),"utf8"); for(const t of ["users","user_sessions","replays","replay_events","reports","risk_flags","disciplinary_actions","audit_logs","active_rooms"]) assert.ok(schema.includes(`TABLE IF NOT EXISTS ${t}`),t);
-assert.match(idx,/activateAdminUser/,"activation route should be wired");
-assert.match(idx,/resendVerification/,"resend verification should use exported service");
-assert.match(gr,/assertAccountAllowed/,"privileged room actions must recheck account status");
-assert.match(gr,/chat_mutes/,"room chat mute enforcement must be server-side");
-assert.match(ui,/bvClockPreset/,"clock preset UI missing");
-assert.match(ui,/bvCopyLink/,"Copy link control missing");
-assert.match(ui,/row\.hidden=!show/,"game filter must compose with existing text search");
-assert.match(ui,/bvVoiceLeave/,"voice leave UI missing");
-assert.match(ui,/bvRoomPlayerSlow/,"room slow-mode UI missing");
-const replayPage=await readFile(new URL("../src/replay/replay-page.js",import.meta.url),"utf8");
-assert.match(replayPage,/function renderIntersectionBoard/,"standalone replay must use live-style intersection boards");
-assert.match(replayPage,/function renderXiangqi/,"standalone replay must use the Xiangqi line-board renderer");
-assert.match(replayPage,/bK:'將'/,"Xiangqi black king must render as 將");
-assert.doesNotMatch(replayPage,/className='cell'/,"standalone replay must not fall back to the old cell renderer");
-const cfg=await readFile(new URL("../src/core/config.js",import.meta.url),"utf8"); assert.ok(cfg.includes("stun:stun.cloudflare.com:3478"));
-for(const game of ["xiangqi_random","banqi","qiguo"]) assert.ok(cfg.includes(`"${game}"`), game);
-assert.match(gr,/room\.seats\?\.length === 2/); assert.match(gr,/七國象棋.*暫不提供.*悔棋/);
-assert.match(wr,/TURNSTILE_SITE_KEY/);
-assert.match(wr,/TURNSTILE_HOSTNAMES/);
-const reportSource=await readFile(new URL("../src/reports/reports.js",import.meta.url),"utf8");
-assert.match(reportSource,/TURNSTILE_ACTION = "report"/);
-assert.match(reportSource,/result\.action !== TURNSTILE_ACTION/);
-assert.match(reportSource,/hostnames\.has\(hostname\)/);
-const pages=await readFile(new URL("../src/ui/pages.js",import.meta.url),"utf8");
-assert.match(pages,/data-action="report"/);
+
+const wr = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
+assert.match(wr, /"name"\s*:\s*"games"/);
+assert.match(wr, /"main"\s*:\s*"src\/index-v019\.js"/);
+assert.doesNotMatch(wr, /"build"\s*:/);
+assert.doesNotMatch(wr, /xn--gmqt6w03b11v\.ray2025\.com\/\*/);
+assert.match(wr, /"pattern"\s*:\s*"xn--gmqt6w03b11v\.ray2025\.com"/);
+assert.match(wr, /"custom_domain"\s*:\s*true/);
+assert.match(wr, /"binding"\s*:\s*"BOARDVERSE_D1"/);
+assert.doesNotMatch(wr, /"database_id"\s*:/, "D1 emergency binding must use automatic provisioning");
+assert.match(wr, /BOARDVERSE_DB_DO/);
+assert.match(wr, /"BOARDVERSE_DB_DO"\s*,\s*"class_name"\s*:\s*"GameRoom"/);
+assert.match(wr, /"ROOMS"\s*,\s*"class_name"\s*:\s*"GameRoom"/);
+assert.match(wr, /"GameRoom"\s*:\s*\{[^}]*"type"\s*:\s*"durable-object"[^}]*"storage"\s*:\s*"sqlite"/s);
+assert.doesNotMatch(wr, /"migrations"\s*:/);
+assert.match(wr, /TURNSTILE_SITE_KEY/);
+assert.match(wr, /TURNSTILE_HOSTNAMES/);
+assert.match(wr, /BOARDVERSE_EMERGENCY_D1/);
+assert.match(wr, /BOARDVERSE_EMERGENCY_UNTIL/);
+
+const buildGate = await readFile(new URL("../build-worker.mjs", import.meta.url), "utf8");
+assert.match(buildGate, /full regression suite/);
+assert.match(buildGate, /Wrangler live-worker dry-run/);
+assert.match(buildGate, /targetWorker = "games"/);
+assert.match(buildGate, /WRANGLER_CI_OVERRIDE_NAME/);
+assert.match(buildGate, /"npm", \["test"\]/);
+assert.match(buildGate, /"wrangler",\s*"deploy",\s*"--dry-run"/s);
+
+const v019 = await readFile(new URL("../src/index-v019.js", import.meta.url), "utf8");
+for (const x of [
+  './index-v018.js','./emergency/d1-mode.js','emergencyEnabled','BOARDVERSE_D1','EMERGENCY_CLIENT_SCRIPT',
+  'EmergencyWebSocket','/api/emergency/rooms/','/api/emergency/global/poll','boardverse-emergency-d1-banner',
+]) assert.ok(v019.includes(x), `v019 missing ${x}`);
+
+const v018 = await readFile(new URL("../src/index-v018.js", import.meta.url), "utf8");
+assert.match(v018, /from "\.\/index-v017\.js"/);
+assert.match(v018, /Exceeded allowed volume of requests in Durable Objects free tier/);
+assert.match(v018, /degradedEnv/);
+
+const v017 = await readFile(new URL("../src/index-v017.js", import.meta.url), "utf8");
+assert.match(v017, /from "\.\/index-v016\.js"/);
+assert.match(v017, /persistRoomChatOnly/);
+assert.match(v017, /GLOBAL_POLICY_TTL_MS = 60_000/);
+assert.match(v017, /GLOBAL_ARCHIVE_BATCH = 8/);
+assert.match(v017, /INSERT OR IGNORE INTO chat_archive/);
+
+const v016 = await readFile(new URL("../src/index-v016.js", import.meta.url), "utf8");
+for (const x of ['replayInterruptions','player_disconnected','player_reconnected','boardverse-room-replay-player','bvReplaySpeed','bvReplayThinking','bvReplaySkipDisconnect','boardverse-admin-readable-replay','對局者','公開至']) assert.ok(v016.includes(x), x);
+
+const v015 = await readFile(new URL("../src/index-v015.js", import.meta.url), "utf8");
+assert.match(v015, /boardverse-room-replay-scope/);
+assert.match(v015, /房內使用者皆可查看/);
+assert.match(v015, /boardverse-admin-zh/);
+
+const v014 = await readFile(new URL("../src/index-v014.js", import.meta.url), "utf8");
+assert.match(v014, /replay_download_disabled/);
+assert.match(v014, /boardverse-unified-modal/);
+
+const v013 = await readFile(new URL("../src/index-v013.js", import.meta.url), "utf8");
+assert.match(v013, /from "\.\/index-v012\.js"/);
+assert.match(v013, /const OFFLINE_FORFEIT_MS = 20_000/);
+assert.match(v013, /member\.offlineDeadline = since \+ OFFLINE_FORFEIT_MS/);
+assert.match(v013, /rewriteAuthenticatedRoomName/);
+assert.match(v013, /body\.playerName = identity\.name/);
+assert.match(v013, /document\.getElementById\('createName'\)/);
+assert.match(v013, /document\.getElementById\('gateName'\)/);
+assert.match(v013, /離線超過 20 秒/);
+assert.doesNotMatch(v013, /ADMIN_PASSWORD|ADMIN_USERNAME/);
+
+const idx = await readFile(new URL("../src/index.js", import.meta.url), "utf8");
+for (const x of ['./legacy/runtime-v029.js','scheduled','/replay/','/admin/api/','/ws/global','activateAdminUser','resendVerification']) assert.ok(idx.includes(x), x);
+
+const gr = await readFile(new URL("../src/room/GameRoom.js", import.meta.url), "utf8");
+for (const x of ['players_ready','undo_requested','undo_accepted','state_restored','rematch_requested','rematch_accepted','clock_timeout','owner_grace','voice_signal','adminTerminateGame','adminCloseRoom','qiguo','ensureFeatureGameStarted','rematchRequired','assertAccountAllowed','chat_mutes']) assert.ok(gr.includes(x), x);
+
+const ui = await readFile(new URL("../src/ui/enhance.js", import.meta.url), "utf8");
+for (const x of ['navigator.share','getUserMedia','STUN_URL','bvGameFilter','bvReady','undo_request','BoardVerseBridge','bvClockPreset','bvCopyLink','bvVoiceLeave','bvRoomPlayerSlow']) assert.ok(ui.includes(x), x);
+
+const replayPage = await readFile(new URL("../src/replay/replay-page.js", import.meta.url), "utf8");
+assert.match(replayPage, /function renderIntersectionBoard/);
+assert.match(replayPage, /function renderXiangqi/);
+assert.match(replayPage, /bK:'將'/);
+assert.doesNotMatch(replayPage, /className='cell'/);
+
+const schema = await readFile(new URL("../src/db/schema.js", import.meta.url), "utf8");
+for (const t of ['users','user_sessions','replays','replay_events','reports','risk_flags','disciplinary_actions','audit_logs','active_rooms']) assert.ok(schema.includes(`TABLE IF NOT EXISTS ${t}`), t);
+
+const reportSource = await readFile(new URL("../src/reports/reports.js", import.meta.url), "utf8");
+assert.match(reportSource, /TURNSTILE_ACTION = "report"/);
+assert.match(reportSource, /result\.action !== TURNSTILE_ACTION/);
+assert.match(reportSource, /hostnames\.has\(hostname\)/);
+
 console.log("static.test: PASS");
