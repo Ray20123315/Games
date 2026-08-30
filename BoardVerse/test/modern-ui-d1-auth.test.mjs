@@ -5,6 +5,7 @@ import vm from "node:vm";
 const ui = await readFile(new URL("../src/ui/modern-ui.js", import.meta.url), "utf8");
 const v020 = await readFile(new URL("../src/index-v020.js", import.meta.url), "utf8");
 const v022 = await readFile(new URL("../src/index-v022.js", import.meta.url), "utf8");
+const v023 = await readFile(new URL("../src/index-v023.js", import.meta.url), "utf8");
 const identity = await readFile(new URL("../src/emergency/d1-identity.js", import.meta.url), "utf8");
 const edge = await readFile(new URL("../src/edge-proxy.js", import.meta.url), "utf8");
 const origin = await readFile(new URL("../src/origin-v022.js", import.meta.url), "utf8");
@@ -46,7 +47,8 @@ assert.match(originConfig, /"GLOBAL_CHAT"\s*,\s*"class_name"\s*:\s*"GlobalChat"/
 assert.match(originConfig, /REPLACE_WITH_NEW_ACCOUNT_D1_DATABASE_ID/);
 assert.match(edgeConfig, /xn--gmqt6w03b11v\.ray2025\.com/);
 assert.match(edgeConfig, /REPLACE_WITH_NEW_ACCOUNT_SUBDOMAIN/);
-assert.match(production, /"main"\s*:\s*"src\/index-v022\.js"/);
+assert.match(production, /"main"\s*:\s*"src\/index-v023\.js"/);
+assert.match(v023, /from "\.\/index-v022\.js"/);
 assert.match(v022, /from "\.\/index-v021\.js"/);
 assert.match(production, /"database_name"\s*:\s*"games-boardverse-recovery-20260830-v2"/);
 
