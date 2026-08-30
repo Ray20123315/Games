@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "games",
-  "main": "src/index-v020.js",
+  "main": "src/index-v021.js",
   "compatibility_date": "2026-08-28",
   "workers_dev": false,
   "keep_vars": true,
