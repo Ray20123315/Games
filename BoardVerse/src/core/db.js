@@ -1,7 +1,8 @@
 import schemaSql from "../db/schema.js";
 import { HttpError } from "./http.js";
 
-let schemaReadyPromise = null;
+const schemaReadyPromises = new WeakMap();
+const SCHEMA_CACHE_KEY = Symbol("boardverse.schemaCacheKey");
 
 class DurablePreparedStatement {
   constructor(stub, sql, binds = []) {
@@ -18,9 +19,48 @@ class DurablePreparedStatement {
 function durableDatabase(namespace) {
   const stub = namespace.getByName("primary");
   return {
+    [SCHEMA_CACHE_KEY]: stub,
     exec(sql) { return stub.query("exec", sql, []); },
     prepare(sql) { return new DurablePreparedStatement(stub, sql); },
   };
+}
+
+function splitSqlStatements(sql) {
+  const statements = [];
+  let current = "", quote = null;
+  for (let i = 0; i < sql.length; i++) {
+    const ch = sql[i];
+    if (quote) {
+      current += ch;
+      if (ch === quote) {
+        if (sql[i + 1] === quote) current += sql[++i];
+        else quote = null;
+      }
+      continue;
+    }
+    if (ch === "'" || ch === '"' || ch === "`") {
+      quote = ch;
+      current += ch;
+      continue;
+    }
+    if (ch === ";") {
+      if (current.trim()) statements.push(current.trim());
+      current = "";
+      continue;
+    }
+    current += ch;
+  }
+  if (current.trim()) statements.push(current.trim());
+  return statements;
+}
+
+async function initializeSchema(db) {
+  if (typeof db.batch === "function") {
+    const statements = splitSqlStatements(schemaSql).map((sql) => db.prepare(sql));
+    if (statements.length) await db.batch(statements);
+    return;
+  }
+  await db.exec(schemaSql);
 }
 
 export function withDatabaseEnv(env) {
@@ -39,10 +79,20 @@ export function withDatabaseEnv(env) {
 
 export async function ensureDbSchema(db) {
   if (!db) return;
-  if (!schemaReadyPromise) {
-    schemaReadyPromise = db.exec(schemaSql).catch((error) => { schemaReadyPromise = null; throw error; });
+  const key = db[SCHEMA_CACHE_KEY] || db;
+  if ((typeof key !== "object" || key === null) && typeof key !== "function") {
+    await initializeSchema(db);
+    return;
   }
-  return schemaReadyPromise;
+  let ready = schemaReadyPromises.get(key);
+  if (!ready) {
+    ready = initializeSchema(db).catch((error) => {
+      schemaReadyPromises.delete(key);
+      throw error;
+    });
+    schemaReadyPromises.set(key, ready);
+  }
+  return ready;
 }
 
 export function requireDb(env) {
