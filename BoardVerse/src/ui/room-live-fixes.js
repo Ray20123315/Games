@@ -13,7 +13,7 @@ function sync(){pending=false;ensureClockRow();fixOpeningPrompt()}
 function schedule(){if(pending)return;pending=true;requestAnimationFrame(sync)}
 window.addEventListener('boardverse:feature',function(e){feature=e.detail||null;schedule()});
 window.addEventListener('boardverse:language',schedule);
-new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true,characterData:true});
+new MutationObserver(schedule).observe(document.documentElement,{childList:true,subtree:true});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',sync,{once:true});else sync();
 })();</script>`;
 
