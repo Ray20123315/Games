@@ -8,7 +8,7 @@ const room = await readFile(new URL("../src/room/focus-guard-room.js", import.me
 const emergency = await readFile(new URL("../src/emergency/d1-focus-mode.js", import.meta.url), "utf8");
 const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 
-assert.match(wrangler, /"main"\s*:\s*"src\/index-v023\.js"/);
+assert.match(wrangler, /"main"\s*:\s*"src\/index-v024\.js"/);
 assert.match(productionEntry, /from "\.\/index-v022\.js"/);
 assert.match(entry, /export \{ FocusGuardGameRoom as GameRoom \}/);
 assert.match(entry, /FOCUS_REPORT_RE/);

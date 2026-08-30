@@ -6,7 +6,7 @@ const source = await readFile(new URL("../src/index-v020.js", import.meta.url), 
 const entry = await readFile(new URL("../src/index-v023.js", import.meta.url), "utf8");
 const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 
-assert.match(wrangler, /"main"\s*:\s*"src\/index-v023\.js"/);
+assert.match(wrangler, /"main"\s*:\s*"src\/index-v024\.js"/);
 assert.match(entry, /from "\.\/index-v022\.js"/);
 assert.match(source, /from "\.\/index-v019\.js"/);
 assert.match(source, /pollEmergencyGlobalLite/);
