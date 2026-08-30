@@ -1,27 +1,17 @@
 import { ensureFeatureState, resetReady } from "./state.js";
 import { applyRoomSettings as applyBaseSettings, roomSettingsSnapshot as baseSnapshot } from "./settings-workspace.js";
+import { switchRoomGame } from "./game-switch.js";
 
-function error(message, code) {
-  const e = new Error(message);
-  e.code = code;
-  return e;
-}
-
-function memberById(room, id) {
-  return room?.members?.find((m) => String(m?.id || "") === String(id || "")) || null;
-}
-
+function error(message, code) { const e = new Error(message); e.code = code; return e; }
 function targetQiguoCount(room, input) {
   if (room?.gameId !== "qiguo" || !input?.rules || !("playerCount" in input.rules)) return null;
   return Math.max(3, Math.min(7, Math.round(Number(input.rules.playerCount) || Number(room.rules?.playerCount) || 7)));
 }
-
 function assertQiguoCapacity(room, target) {
   if (target == null) return;
   const occupied = (room.seats || []).filter(Boolean);
   if (occupied.length > target) throw error(`目前已有 ${occupied.length} 位玩家入席，不能把七國象棋縮成 ${target} 人。`, "player_count_too_small");
 }
-
 function applyQiguoCapacity(room, target) {
   if (target == null || room.gameId !== "qiguo") return false;
   const occupied = (room.seats || []).filter(Boolean);
@@ -35,7 +25,6 @@ function applyQiguoCapacity(room, target) {
   resetReady(room, false);
   return true;
 }
-
 function nonSeatedMembers(room) {
   const seats = new Set((room?.seats || []).filter(Boolean));
   return (room?.members || []).filter((m) => m && !seats.has(m.id) && m.role !== "pending");
@@ -45,33 +34,47 @@ export function roomSettingsSnapshot(room, token, { voiceAvailable = true } = {}
   const snapshot = baseSnapshot(room, token);
   if (!snapshot) return null;
   const bv = ensureFeatureState(room);
-  return {
-    ...snapshot,
-    voiceEnabled: voiceAvailable ? !!bv.voiceEnabled : false,
-    voiceAvailable: !!voiceAvailable && room.gameId !== "qiguo",
-  };
+  return { ...snapshot, voiceEnabled: voiceAvailable ? !!bv.voiceEnabled : false, voiceAvailable: !!voiceAvailable && room.gameId !== "qiguo" };
 }
 
 export async function applyRoomSettings(room, token, input = {}, { voiceAvailable = true } = {}) {
-  const bv = ensureFeatureState(room);
-  const requestedVoice = "voiceEnabled" in input ? !!input.voiceEnabled : !!bv.voiceEnabled;
-  const voiceChanged = requestedVoice !== !!bv.voiceEnabled;
-  const qiguoTarget = targetQiguoCount(room, input);
+  const requestedGameId = String(input.gameId || room.gameId || "");
+  const switchingGame = requestedGameId && requestedGameId !== String(room.gameId || "");
+  if (switchingGame && room.status === "playing") throw error("對局進行中不可切換棋類；本局結束後可直接在原房切換。", "settings_locked_during_match");
 
-  if (voiceChanged) {
+  const bv = ensureFeatureState(room);
+  const targetIsQiguo = requestedGameId === "qiguo";
+  const explicitlyEnablingVoice = input.voiceEnabled === true;
+  const requestedVoice = targetIsQiguo || !voiceAvailable ? false : ("voiceEnabled" in input ? !!input.voiceEnabled : !!bv.voiceEnabled);
+  const voiceChanged = requestedVoice !== !!bv.voiceEnabled;
+  const qiguoTarget = switchingGame ? null : targetQiguoCount(room, input);
+
+  if (explicitlyEnablingVoice && targetIsQiguo) throw error("七國象棋不提供 1v1 P2P 語音。", "voice_unsupported_game");
+  if (explicitlyEnablingVoice && !voiceAvailable) throw error("緊急 D1 模式不提供 P2P 語音；完整模式恢復後才能啟用。", "voice_unavailable_emergency");
+  if (voiceChanged && !switchingGame) {
     if (room.status === "playing") throw error("對局進行中不可變更 P2P 語音設定。", "settings_locked_during_match");
-    if (requestedVoice && !voiceAvailable) throw error("緊急 D1 模式不提供 P2P 語音；完整模式恢復後才能啟用。", "voice_unavailable_emergency");
-    if (requestedVoice && room.gameId === "qiguo") throw error("七國象棋不提供 1v1 P2P 語音。", "voice_unsupported_game");
-    if (requestedVoice && ((room.queue || []).length || nonSeatedMembers(room).length)) {
-      throw error("啟用 P2P 語音前，請先清空排隊並讓觀眾離開房間。", "voice_requires_two_players");
-    }
+    if (requestedVoice && ((room.queue || []).length || nonSeatedMembers(room).length)) throw error("啟用 P2P 語音前，請先清空排隊並讓觀眾離開房間。", "voice_requires_two_players");
   }
   assertQiguoCapacity(room, qiguoTarget);
 
-  const saved = await applyBaseSettings(room, token, input);
+  if (switchingGame) {
+    const baseInput = { ...input };
+    delete baseInput.gameId;
+    delete baseInput.rules;
+    await applyBaseSettings(room, token, baseInput);
+    await switchRoomGame(room, requestedGameId, { voiceAvailable });
+    const after = ensureFeatureState(room);
+    after.voiceEnabled = targetIsQiguo || !voiceAvailable ? false : requestedVoice;
+    after.pendingRematch = null;
+    resetReady(room, false);
+    after.updatedAt = Date.now();
+    room.updatedAt = Date.now();
+    return roomSettingsSnapshot(room, token, { voiceAvailable });
+  }
+
+  await applyBaseSettings(room, token, input);
   const after = ensureFeatureState(room);
   let postChanged = false;
-
   if (applyQiguoCapacity(room, qiguoTarget)) postChanged = true;
   if (voiceChanged) {
     after.voiceEnabled = requestedVoice;
@@ -80,14 +83,8 @@ export async function applyRoomSettings(room, token, input = {}, { voiceAvailabl
     resetReady(room, false);
     postChanged = true;
   }
-  if (room.gameId === "qiguo" && after.voiceEnabled) {
-    after.voiceEnabled = false;
-    postChanged = true;
-  }
-  if (postChanged) {
-    after.updatedAt = Date.now();
-    room.updatedAt = Date.now();
-  }
+  if (room.gameId === "qiguo" && after.voiceEnabled) { after.voiceEnabled = false; postChanged = true; }
+  if (postChanged) { after.updatedAt = Date.now(); room.updatedAt = Date.now(); }
   return roomSettingsSnapshot(room, token, { voiceAvailable });
 }
 
@@ -110,8 +107,9 @@ export async function emergencyRoomSettings(db, roomId, token, input = null) {
       const status = e?.code === "owner_required" ? 403 : e?.code === "stale_revision" ? 409 : 400;
       return { ok: false, status, code: e?.code || "settings_failed", message: e?.message || "房間設定更新失敗。" };
     }
-    const result = await db.prepare("UPDATE emergency_rooms SET revision=revision+1,room_json=?,updated_at=? WHERE room_id=? AND revision=?")
-      .bind(JSON.stringify(room), Date.now(), roomId, Number(row.revision || 0)).run();
+    const players = Array.isArray(room.seats) ? room.seats.filter(Boolean).length : 0;
+    const result = await db.prepare("UPDATE emergency_rooms SET revision=revision+1,room_json=?,room_name=?,game_id=?,status=?,private_room=?,players=?,queue_enabled=?,queue_length=?,updated_at=? WHERE room_id=? AND revision=?")
+      .bind(JSON.stringify(room), String(room.name || room.id), String(room.gameId || "gomoku"), String(room.status || "waiting"), room.privateRoom ? 1 : 0, players, room.settings?.queueEnabled ? 1 : 0, Array.isArray(room.queue) ? room.queue.length : 0, Date.now(), roomId, Number(row.revision || 0)).run();
     if (Number(result?.meta?.changes || result?.changes || 0) > 0) return { ok: true, settings };
   }
   return { ok: false, status: 409, code: "stale_revision", message: "房間狀態剛剛已更新，請再試一次。" };

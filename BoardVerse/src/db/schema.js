@@ -1,5 +1,4 @@
-export const BOARDVERSE_SCHEMA_SQL = String.raw`PRAGMA foreign_keys = ON;
-CREATE TABLE IF NOT EXISTS users (
+export const BOARDVERSE_SCHEMA_SQL = String.raw`CREATE TABLE IF NOT EXISTS users (
  id TEXT PRIMARY KEY, username_normalized TEXT NOT NULL UNIQUE, username_display TEXT NOT NULL,
  email_normalized TEXT NOT NULL UNIQUE, email_verified_at INTEGER,
  password_algorithm TEXT NOT NULL, password_iterations INTEGER NOT NULL, password_salt TEXT, password_hash TEXT,

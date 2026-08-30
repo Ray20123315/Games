@@ -41,9 +41,18 @@ export class HttpError extends Error {
   constructor(status, code, message) { super(message); this.status = status; this.code = code; }
 }
 
+function safeInternalMessage(error) {
+  const raw = String(error?.message || "");
+  if (/D1_|SQLITE|database|prepare\(|statement|constraint|syntax error|Cloudflare|Durable Object/i.test(raw)) {
+    return "系統資料服務暫時無法完成此操作，請稍後再試。";
+  }
+  return "伺服器暫時無法完成此操作，請稍後再試。";
+}
+
 export function toErrorResponse(error) {
   if (error instanceof HttpError) return errorJson(error.message, error.status, error.code);
-  return errorJson(error?.message || "伺服器處理失敗。", 500, "internal_error");
+  try { console.error("[BoardVerse internal error]", error); } catch {}
+  return errorJson(safeInternalMessage(error), 500, "internal_error");
 }
 
 export function parseCookies(request) {
