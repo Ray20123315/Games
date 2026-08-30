@@ -5,6 +5,7 @@ import vm from "node:vm";
 const ui = await readFile(new URL("../src/ui/modern-ui.js", import.meta.url), "utf8");
 const urgent = await readFile(new URL("../src/ui/urgent-v023.js", import.meta.url), "utf8");
 const authRoomUi = await readFile(new URL("../src/ui/authenticated-room-fields.js", import.meta.url), "utf8");
+const liveUi = await readFile(new URL("../src/ui/room-live-fixes.js", import.meta.url), "utf8");
 const legacy = await readFile(new URL("../src/legacy/runtime-v029.js", import.meta.url), "utf8");
 const v020 = await readFile(new URL("../src/index-v020.js", import.meta.url), "utf8");
 const v022 = await readFile(new URL("../src/index-v022.js", import.meta.url), "utf8");
@@ -49,11 +50,18 @@ for (const marker of [
 assert.doesNotMatch(authRoomUi, /window\.alert\(/, 'authenticated room field handling must not use native alerts');
 
 for (const marker of [
-  'injectAuthenticatedRoomFields','authenticatedRoomIdentity','resolveAuthenticatedRoomSession',
+  'boardverse-room-live-fixes','bvClockRow','bvRoomMetaControls','feature.clock',"c.mode!=='untimed'",
+  'openingText','openingActions',"actions.querySelector('button')",'取得選色權，等待該玩家選擇持色。',
+  '取得选色权，等待该玩家选择持色。','waiting for that player to choose a color',
+]) assert.ok(liveUi.includes(marker), `live room UI fix missing ${marker}`);
+assert.doesNotMatch(liveUi, /B: 0:00|W: 0:00/, 'live UI fix must not hard-code zero clocks');
+
+for (const marker of [
+  'injectAuthenticatedRoomFields','injectRoomLiveFixes','authenticatedRoomIdentity','resolveAuthenticatedRoomSession',
   '/feature/authenticated-room-session','sessionUser','adminPlayerEntitlement','ensureDbSchema',
   'body.returnPassword = ""','body.sessionToken = existing.token','memberForUser',
   'if (!identity) return request',
-]) assert.ok(v023.includes(marker), `v023 authenticated room flow missing ${marker}`);
+]) assert.ok(v023.includes(marker), `v023 authenticated/live room flow missing ${marker}`);
 assert.match(v023, /await ensureDbSchema\(db\)/);
 assert.match(v023, /SELECT room_json FROM emergency_rooms WHERE room_id=\? AND expires_at>\?/);
 assert.match(v023, /return json\(\{ ok: true, token: String\(member\.token\), name: String\(member\.name \|\| ""\) \}\)/);
@@ -62,6 +70,7 @@ for (const marker of ['returnPassword','verifyPasswordRecord','existing.password
   assert.ok(legacy.includes(marker), `guest return-password/session fallback missing ${marker}`);
 }
 assert.match(legacy, /if \(!allowed && existing\.passwordHash\) allowed = await verifyPasswordRecord\(existing, password\)/);
+assert.match(legacy, /取得選色權，請選擇持色。/, 'legacy chooser prompt remains the source prompt and is viewer-corrected by the v023 live UI layer');
 
 for (const marker of ['memberIdentities','memberUsers','revision=revision+1','issueEmergencyChatIdentity','postAuthenticatedEmergencyGlobal','signPayload','verifySignedPayload']) {
   assert.ok(identity.includes(marker), `emergency identity missing ${marker}`);
@@ -103,5 +112,12 @@ const authBodyStart = authRoomUi.indexOf('>', authScriptStart) + 1;
 const authBodyEnd = authRoomUi.indexOf('</script>`;', authBodyStart);
 assert.ok(authBodyStart > authScriptStart && authBodyEnd > authBodyStart, "authenticated room fields script boundary invalid");
 new vm.Script(authRoomUi.slice(authBodyStart, authBodyEnd), { filename: "authenticated-room-fields.js" });
+
+const liveScriptStart = liveUi.indexOf('export const ROOM_LIVE_FIXES_SCRIPT = String.raw`<script');
+assert.ok(liveScriptStart >= 0, "room live fixes inline script missing");
+const liveBodyStart = liveUi.indexOf('>', liveScriptStart) + 1;
+const liveBodyEnd = liveUi.indexOf('</script>`;', liveBodyStart);
+assert.ok(liveBodyStart > liveScriptStart && liveBodyEnd > liveBodyStart, "room live fixes script boundary invalid");
+new vm.Script(liveUi.slice(liveBodyStart, liveBodyEnd), { filename: "room-live-fixes.js" });
 
 console.log("modern-ui-d1-auth.test: PASS");
