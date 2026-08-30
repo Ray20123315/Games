@@ -22,7 +22,11 @@ assert.match(source, /stripOldNotices/);
 assert.match(source, /id="bvEmergencyNotice"/);
 assert.match(source, /今天不再顯示/);
 assert.match(source, /boardverseEmergencyNoticeDismissed/);
-assert.match(source, /BoardVerse 服務模式說明/);
+assert.match(source, /BoardVerse 服務模式調整/);
+assert.match(source, /Cloudflare Durable Objects 額度已用完/);
+assert.match(source, /已自動切換到<strong>緊急 D1 模式<\/strong>/);
+assert.match(source, /部分功能暫時受限，敬請見諒/);
+assert.match(source, /祝各位遊玩順利、對局愉快/);
 assert.match(source, /我知道了/);
 
 assert.match(source, /function patchHomeNavigation\(body\)/);
