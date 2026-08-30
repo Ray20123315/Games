@@ -50,6 +50,12 @@ for (const marker of [
 ]) assert.ok(production.includes(marker), `production authenticated emergency rejoin missing ${marker}`);
 assert.match(production, /if \(emergencyEnabled\(env\)\) \{[\s\S]*?BOARDVERSE_D1\.prepare\("SELECT room_json FROM emergency_rooms/);
 
+for (const marker of [
+  "payload.type==='state'","payload.type==='feature_state'",'payload.feature.kickableMembers',
+  'm.connected=true','r.players.host.connected=true','r.players.guest.connected=true',
+]) assert.ok(entry.includes(marker), `emergency presence normalization missing ${marker}`);
+assert.match(entry, /feature_state'[\s\S]*?kickableMembers[\s\S]*?connected=true/, 'emergency host-management presence must match normalized room presence');
+
 const start = entry.indexOf('const EMERGENCY_CLIENT_SCRIPT = String.raw`<script');
 assert.ok(start >= 0, "emergency client script missing");
 const bodyStart = entry.indexOf('>', start) + 1;
