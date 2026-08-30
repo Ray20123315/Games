@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 
 const wr = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 assert.match(wr, /"name"\s*:\s*"games"/);
-assert.match(wr, /"main"\s*:\s*"src\/index-v021\.js"/);
+assert.match(wr, /"main"\s*:\s*"src\/index-v022\.js"/);
 assert.doesNotMatch(wr, /"build"\s*:/);
 assert.doesNotMatch(wr, /xn--gmqt6w03b11v\.ray2025\.com\/\*/);
 assert.match(wr, /"pattern"\s*:\s*"xn--gmqt6w03b11v\.ray2025\.com"/);
@@ -27,6 +27,13 @@ assert.match(buildGate, /targetWorker = "games"/);
 assert.match(buildGate, /WRANGLER_CI_OVERRIDE_NAME/);
 assert.match(buildGate, /"npm", \["test"\]/);
 assert.match(buildGate, /"wrangler",\s*"deploy",\s*"--dry-run"/s);
+
+const v022 = await readFile(new URL("../src/index-v022.js", import.meta.url), "utf8");
+for (const x of [
+  './index-v021.js','./room/settings-workspace.js','./ui/room-workspace-ui.js','./ui/room-clock-presets.js',
+  './ui/room-account-presets.js','./ui/room-rule-selects.js','SETTINGS_RE','/feature/room-settings',
+  'await applyRoomSettings','injectRoomWorkspace','injectClockPresetAddon','injectAccountPresetAddon','injectRuleSelectAddon',
+]) assert.ok(v022.includes(x), `v022 missing ${x}`);
 
 const v021 = await readFile(new URL("../src/index-v021.js", import.meta.url), "utf8");
 for (const x of [
