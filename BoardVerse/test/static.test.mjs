@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 
 const wr = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 assert.match(wr, /"name"\s*:\s*"games"/);
-assert.match(wr, /"main"\s*:\s*"src\/index-v023\.js"/);
+assert.match(wr, /"main"\s*:\s*"src\/index-v024\.js"/);
 assert.doesNotMatch(wr, /"build"\s*:/);
 assert.doesNotMatch(wr, /xn--gmqt6w03b11v\.ray2025\.com\/\*/);
 assert.match(wr, /"pattern"\s*:\s*"xn--gmqt6w03b11v\.ray2025\.com"/);
