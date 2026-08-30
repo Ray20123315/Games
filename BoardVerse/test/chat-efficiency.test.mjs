@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const source = await readFile(new URL("../src/index-v017.js", import.meta.url), "utf8");
+const production = await readFile(new URL("../src/index-v022.js", import.meta.url), "utf8");
 const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 
 assert.match(source, /ROOM_CHAT_MODERATION_TTL_MS = 15_000/);
@@ -26,6 +27,7 @@ assert.match(source, /INSERT OR IGNORE INTO chat_archive/);
 assert.match(source, /chatArchiveCursorId/);
 assert.match(source, /ctx\.waitUntil\(this\.flushArchive/);
 assert.doesNotMatch(source, /archiveChatMessage\(/, "global chat must batch archive instead of one DB call per message");
-assert.match(wrangler, /"main": "src\/index-v021\.js"/);
+assert.match(wrangler, /"main": "src\/index-v022\.js"/);
+assert.match(production, /from "\.\/index-v021\.js"/);
 
 console.log("chat-efficiency.test: PASS");

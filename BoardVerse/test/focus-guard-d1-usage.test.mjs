@@ -3,11 +3,13 @@ import { readFile } from "node:fs/promises";
 import vm from "node:vm";
 
 const entry = await readFile(new URL("../src/index-v021.js", import.meta.url), "utf8");
+const productionEntry = await readFile(new URL("../src/index-v022.js", import.meta.url), "utf8");
 const room = await readFile(new URL("../src/room/focus-guard-room.js", import.meta.url), "utf8");
 const emergency = await readFile(new URL("../src/emergency/d1-focus-mode.js", import.meta.url), "utf8");
 const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 
-assert.match(wrangler, /"main"\s*:\s*"src\/index-v021\.js"/);
+assert.match(wrangler, /"main"\s*:\s*"src\/index-v022\.js"/);
+assert.match(productionEntry, /from "\.\/index-v021\.js"/);
 assert.match(entry, /export \{ FocusGuardGameRoom as GameRoom \}/);
 assert.match(entry, /FOCUS_REPORT_RE/);
 assert.match(entry, /keepalive:true/);
