@@ -45,7 +45,7 @@ assert.match(originConfig, /"GLOBAL_CHAT"\s*,\s*"class_name"\s*:\s*"GlobalChat"/
 assert.match(originConfig, /REPLACE_WITH_NEW_ACCOUNT_D1_DATABASE_ID/);
 assert.match(edgeConfig, /xn--gmqt6w03b11v\.ray2025\.com/);
 assert.match(edgeConfig, /REPLACE_WITH_NEW_ACCOUNT_SUBDOMAIN/);
-assert.match(production, /"main"\s*:\s*"src\/index-v021\.js"/);
+assert.match(production, /"main"\s*:\s*"src\/index-v022\.js"/);
 assert.match(production, /"database_name"\s*:\s*"games-boardverse-recovery-20260830-v2"/);
 
 const scriptStart = ui.indexOf('const MODERN_UI_SCRIPT = String.raw`<script');
