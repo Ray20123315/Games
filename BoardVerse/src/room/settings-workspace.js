@@ -29,9 +29,19 @@ function sanitizeRules(current, incoming) {
 function memberByToken(room, token) {
   return room?.members?.find((m) => String(m?.token || "") === String(token || "")) || null;
 }
+function memberById(room, id) {
+  return room?.members?.find((m) => String(m?.id || "") === String(id || "")) || null;
+}
 function ownerByToken(room, token) {
   const member = memberByToken(room, token);
   return member && member.id === room?.ownerId ? member : null;
+}
+function disableQueue(room) {
+  if (!Array.isArray(room?.queue) || !room.queue.length) return;
+  for (const id of room.queue.splice(0)) {
+    const member = memberById(room, id);
+    if (member) { member.role = "spectator"; member.side = null; }
+  }
 }
 
 export function roomSettingsSnapshot(room, token) {
@@ -66,9 +76,9 @@ export function applyRoomSettings(room, token, input = {}) {
   }
   const bv = ensureFeatureState(room);
   const playing = room.status === "playing";
-  const wantsCore = input.rules || input.clockConfig || "queueEnabled" in input || "rotationPolicy" in input || "gameId" in input;
+  const wantsCore = input.rules || input.clockConfig || "queueEnabled" in input || "rotationPolicy" in input || "gameId" in input || "focusGuardEnabled" in input || "focusGuardAllowedLeaves" in input;
   if (playing && wantsCore) {
-    const error = new Error("對局進行中不可變更棋類、規則、棋鐘或輪替；請在本局結束後再儲存這些設定。");
+    const error = new Error("對局進行中不可變更棋類、規則、棋鐘、輪替或防切頁規則；請在本局結束後再儲存這些設定。");
     error.code = "settings_locked_during_match";
     throw error;
   }
@@ -77,26 +87,30 @@ export function applyRoomSettings(room, token, input = {}) {
   if ("privateRoom" in input) room.privateRoom = !!input.privateRoom;
   if (!room.settings || typeof room.settings !== "object") room.settings = {};
   if (!playing) {
-    // Changing game engines in-place would invalidate current replay/state structures.
-    // The game selector is exposed as read-only in the workspace; reject forged changes server-side.
+    // The next match is recreated by the legacy room engine from room.rules,
+    // so rule changes saved while waiting apply to the next start/rematch.
     if (input.gameId && String(input.gameId) !== String(room.gameId)) {
       const error = new Error("目前房間建立後不可直接改棋類；請建立新房間以切換棋類。");
       error.code = "game_immutable";
       throw error;
     }
-    if ("queueEnabled" in input && room.gameId !== "qiguo") room.settings.queueEnabled = !!input.queueEnabled;
+    if ("queueEnabled" in input && room.gameId !== "qiguo") {
+      room.settings.queueEnabled = !!input.queueEnabled;
+      if (!room.settings.queueEnabled) disableQueue(room);
+    }
     if (ROTATIONS.has(String(input.rotationPolicy || ""))) room.settings.rotationPolicy = String(input.rotationPolicy);
     if (input.rules && typeof input.rules === "object") room.rules = sanitizeRules(room.rules, input.rules);
     if (input.clockConfig && typeof input.clockConfig === "object") bv.clockConfig = normalizeClockConfig(input.clockConfig);
+    if ("focusGuardEnabled" in input) bv.focusGuardEnabled = input.focusGuardEnabled !== false;
+    if ("focusGuardAllowedLeaves" in input) bv.focusGuardAllowedLeaves = clampInt(input.focusGuardAllowedLeaves, 0, 20, 0);
+    bv.focusGuardViolations = {};
+    bv.focusGuardLastEvent = {};
+    bv.focusGuardMatchId = null;
+    bv.pendingRematch = null;
+    resetReady(room, false);
   }
   if ("playerChatSlowSeconds" in input) bv.playerChatSlowMs = clampInt(input.playerChatSlowSeconds, 0, 3600, 0) * 1000;
   if ("spectatorChatSlowSeconds" in input) bv.spectatorChatSlowMs = clampInt(input.spectatorChatSlowSeconds, 0, 3600, 0) * 1000;
-  if ("focusGuardEnabled" in input) bv.focusGuardEnabled = input.focusGuardEnabled !== false;
-  if ("focusGuardAllowedLeaves" in input) bv.focusGuardAllowedLeaves = clampInt(input.focusGuardAllowedLeaves, 0, 20, 0);
-  bv.focusGuardViolations = {};
-  bv.focusGuardLastEvent = {};
-  bv.pendingRematch = null;
-  resetReady(room, false);
   bv.revision = Number(bv.revision || 0) + 1;
   bv.updatedAt = Date.now();
   room.updatedAt = Date.now();
@@ -117,7 +131,7 @@ export async function emergencyRoomSettings(db, roomId, token, input = null) {
     }
     let settings;
     try { settings = applyRoomSettings(room, token, input); }
-    catch (error) { return { ok: false, status: 400, code: error?.code || "settings_failed", message: error?.message || "房間設定更新失敗。" }; }
+    catch (error) { return { ok: false, status: error?.code === "owner_required" ? 403 : 400, code: error?.code || "settings_failed", message: error?.message || "房間設定更新失敗。" }; }
     const now = Date.now();
     const result = await db.prepare("UPDATE emergency_rooms SET revision=revision+1,room_json=?,updated_at=? WHERE room_id=? AND revision=?")
       .bind(JSON.stringify(room), now, roomId, Number(row.revision || 0)).run();
