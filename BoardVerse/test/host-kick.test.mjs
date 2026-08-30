@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("../src/index-v012.js", import.meta.url), "utf8");
+const production = fs.readFileSync(new URL("../src/index-v022.js", import.meta.url), "utf8");
 const wrangler = fs.readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 
 test("preserves historical exports and delegates through v011", () => {
@@ -42,6 +43,7 @@ test("only owner feature state exposes member ids and UI sends revision", () => 
   assert.match(source, /type:'host_kick',memberId:m\.id,revision:feature\.revision/);
 });
 
-test("deployment entry points at v021 focus-guard compatibility layer", () => {
-  assert.match(wrangler, /"main": "src\/index-v021\.js"/);
+test("deployment entry wraps v021 focus guard with v022 room workspace", () => {
+  assert.match(wrangler, /"main": "src\/index-v022\.js"/);
+  assert.match(production, /from "\.\/index-v021\.js"/);
 });
