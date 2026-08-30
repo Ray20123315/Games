@@ -124,6 +124,7 @@ export class FocusGuardGameRoom extends BaseGameRoom {
     bv.focusGuardViolations = {};
     bv.focusGuardLastEvent = {};
     bv.focusGuardMatchId = null;
+    bv.pendingRematch = null;
     resetReady(room, false);
     appendEvent(room, "focus_guard_updated", publicActor(member), {
       enabled: bv.focusGuardEnabled,
