@@ -5,6 +5,7 @@ import vm from "node:vm";
 const ui = await readFile(new URL("../src/ui/modern-ui.js", import.meta.url), "utf8");
 const urgent = await readFile(new URL("../src/ui/urgent-v023.js", import.meta.url), "utf8");
 const authRoomUi = await readFile(new URL("../src/ui/authenticated-room-fields.js", import.meta.url), "utf8");
+const legacy = await readFile(new URL("../src/legacy/runtime-v029.js", import.meta.url), "utf8");
 const v020 = await readFile(new URL("../src/index-v020.js", import.meta.url), "utf8");
 const v022 = await readFile(new URL("../src/index-v022.js", import.meta.url), "utf8");
 const v023 = await readFile(new URL("../src/index-v023.js", import.meta.url), "utf8");
@@ -49,11 +50,18 @@ assert.doesNotMatch(authRoomUi, /window\.alert\(/, 'authenticated room field han
 
 for (const marker of [
   'injectAuthenticatedRoomFields','authenticatedRoomIdentity','resolveAuthenticatedRoomSession',
-  '/feature/authenticated-room-session','sessionUser','adminPlayerEntitlement',
+  '/feature/authenticated-room-session','sessionUser','adminPlayerEntitlement','ensureDbSchema',
   'body.returnPassword = ""','body.sessionToken = existing.token','memberForUser',
+  'if (!identity) return request',
 ]) assert.ok(v023.includes(marker), `v023 authenticated room flow missing ${marker}`);
+assert.match(v023, /await ensureDbSchema\(db\)/);
 assert.match(v023, /SELECT room_json FROM emergency_rooms WHERE room_id=\? AND expires_at>\?/);
 assert.match(v023, /return json\(\{ ok: true, token: String\(member\.token\), name: String\(member\.name \|\| ""\) \}\)/);
+
+for (const marker of ['returnPassword','verifyPasswordRecord','existing.passwordHash','sessionToken && sessionToken === existing.token']) {
+  assert.ok(legacy.includes(marker), `guest return-password/session fallback missing ${marker}`);
+}
+assert.match(legacy, /if \(!allowed && existing\.passwordHash\) allowed = await verifyPasswordRecord\(existing, password\)/);
 
 for (const marker of ['memberIdentities','memberUsers','revision=revision+1','issueEmergencyChatIdentity','postAuthenticatedEmergencyGlobal','signPayload','verifySignedPayload']) {
   assert.ok(identity.includes(marker), `emergency identity missing ${marker}`);
