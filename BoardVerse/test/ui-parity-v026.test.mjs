@@ -20,13 +20,13 @@ const single=enhanceV026Html(enhanceV025Html(injectSingleplayerBoardParity(botPa
 for(const marker of ["boardverse-v026-full-parity-style","boardverse-v026-full-parity-script","bv-singleplayer-v025","gameCatalog","max-width:1100px"])assert.ok(single.includes(marker),marker);
 for(const [i,script] of scripts(single).entries())new vm.Script(script,{filename:`single-v026-${i}.js`});
 
-const boards=enhanceV026Html('<html><head></head><body><button id="bvGameCatalogToggle">棋類與變種 ▾</button><div id="gameList" hidden></div></body></html>',"/boards");
-assert.match(boards,/bvGameCatalogToggle/);
-assert.match(boards,/data-bv-v026-sentinel/);
+const boards=enhanceV026Html('<html><head></head><body><div id="gameList" hidden></div><script id="boardverse-boards-page-script">window.__boardsFixture=true;</script></body></html>',"/boards");
+assert.match(boards,/id="bvGameCatalogToggle" data-bv-v026-sentinel="1" hidden/);
 assert.match(boards,/tagName==='BUTTON'/);
 assert.match(boards,/replaceWith/);
 assert.match(boards,/list\.hidden=false/);
 assert.match(boards,/localStorage\.removeItem\('bvGameCatalogCollapsed'\)/);
+for(const [i,script] of scripts(boards).entries())new vm.Script(script,{filename:`boards-v026-${i}.js`});
 
 const entry=await readFile(new URL("../src/index-v025.js",import.meta.url),"utf8");
 for(const marker of ["./ui/page-parity-v026.js","enhanceV026Html","x-boardverse-ui-hotfix","v026"])assert.ok(entry.includes(marker),marker);
