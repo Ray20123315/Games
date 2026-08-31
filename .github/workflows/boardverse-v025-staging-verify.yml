@@ -1,0 +1,30 @@
+name: BoardVerse v025 staging verification
+
+on:
+  push:
+    branches:
+      - boardverse-ui-parity-i18n-v025
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: BoardVerse
+    env:
+      WORKERS_CI: "1"
+      WORKERS_CI_BRANCH: boardverse-ui-parity-i18n-v025
+      WRANGLER_CI_OVERRIDE_NAME: games
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+      - name: Run canonical BoardVerse validation
+        run: node build-worker.mjs
