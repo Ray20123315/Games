@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { injectThemeHardening } from '../src/ui/theme-hardening.js';
+import { injectThemeSurfaceFix } from '../src/ui/theme-surface-fix.js';
 import { platformHomePage, playPortalPage, injectBoardLobbyPolish } from '../src/ui/platform-pages.js';
 import { botPage } from '../src/bot/page.js';
 import { injectVoiceSettingsAddon } from '../src/ui/room-voice-settings.js';
@@ -10,9 +11,12 @@ assert.match(home,/href="\/boards"/);assert.match(home,/href="\/cards"/);assert.
 assert.match(portal,/遊戲類型/);assert.match(bot,/5 難度 Bot/);
 const theme=injectThemeHardening('<html><head></head><body></body></html>');
 for(const marker of ['bv-theme-slider','document.startViewTransition','prefers-reduced-motion','.line-board{--wood:#c99a50!important;--wood2:#b27f39!important}','--accent:#00f5ff','--accent2:#ff42f5'])assert.ok(theme.includes(marker),marker);
+const surface=injectThemeSurfaceFix('<html lang="en-US"><head></head><body></body></html>');
+for(const marker of ['--p:#ffffff!important','--g:#00f5ff!important','Black','White','Sci-fi','#new.primary'])assert.ok(surface.includes(marker),marker);
+assert.doesNotMatch(surface,/\.line-board\{|#board\s*\{/);
 const board=injectBoardLobbyPolish('<html><head></head><body><div class="app-frame"><div class="game-catalog"><div class="game-catalog-head"></div><div id="gameList"></div></div></div></body></html>');assert.match(board,/bvGameCatalogToggle/);
 const voice=injectVoiceSettingsAddon('<html><body></body></html>');assert.match(voice,/voice\.disabled=!ok/);assert.match(voice,/body\.voiceEnabled=available\(\)/);
-const entry=await readFile(new URL('../src/index-v024.js',import.meta.url),'utf8');assert.match(entry,/handlePlatformRoute/);assert.match(entry,/handleCardRoutes/);assert.match(entry,/do_unavailable/);
+const entry=await readFile(new URL('../src/index-v024.js',import.meta.url),'utf8');assert.match(entry,/handlePlatformRoute/);assert.match(entry,/handleCardRoutes/);assert.match(entry,/injectThemeSurfaceFix/);assert.match(entry,/if\(platform\)return polish\(platform,path,env\)/);assert.match(entry,/if\(cards\)return polish\(cards,path,env\)/);assert.match(entry,/do_unavailable/);
 const router=await readFile(new URL('../src/ui/platform-router.js',import.meta.url),'utf8');for(const marker of ['/boards','/cards','/singleplayer','/bot','/zh-tw','/zh-cn','/en-us'])assert.ok(router.includes(marker),marker);assert.match(router,/replaceAll\('\/bot','\/singleplayer'\)/);
 const routes=await readFile(new URL('../src/cards/routes.js',import.meta.url),'utf8');for(const marker of ['listD1CardRooms','createD1CardRoom','readyD1CardRoom','actionD1CardRoom','isCardDoQuotaError'])assert.ok(routes.includes(marker),marker);
 const backend=await readFile(new URL('../src/admin/data-source-switch.js',import.meta.url),'utf8');assert.match(backend,/withDatabaseEnv/);
