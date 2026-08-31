@@ -10,11 +10,14 @@ const theme = await readFile(new URL('src/ui/theme-hardening.js', root), 'utf8')
 const entry = await readFile(new URL('src/index-v024.js', root), 'utf8');
 
 for (const marker of ['adminDataSourceFromRequest','adminDataSourceAvailability','adminDataSourceEnv','admin_d1_room_read_only','emergencyAdminRead']) assert.ok(admin.includes(marker), marker);
-assert.match(admin, /source === "d1".*request\.method !== "GET"/s);
+assert.match(admin, /source\s*===\s*["']d1["'][\s\S]*?request\.method\s*!==\s*["']GET["'][\s\S]*?D1_ROOM_WRITE_RE\.test\(url\.pathname\)/);
 assert.match(admin, /BOARDVERSE_DB/);
 assert.match(admin, /BOARDVERSE_EMERGENCY_D1/);
 
-for (const marker of ['boardverseAdminDataSource','bvAdminDataSource','bvAdminSourceBadge',"searchParams.set('source',source||defaultSource)",'D1 房間檢視為唯讀']) assert.ok(adminUi.includes(marker), marker);
+for (const marker of ['boardverseAdminDataSource','bvAdminDataSource','bvAdminSourceBadge','defaultSource','D1 房間檢視為唯讀']) assert.ok(adminUi.includes(marker), marker);
+assert.match(adminUi, /searchParams\.set\(["']source["'],source\)/);
+assert.match(adminUi, /!source\|\|!available\[source\]/);
+assert.match(adminUi, /available\[defaultSource\]\?defaultSource/);
 assert.ok(adminUi.includes('location.assign(u.href)'));
 assert.ok(adminUi.includes('window.fetch=function'));
 
@@ -34,5 +37,5 @@ for (const src of [adminUi, modal, theme]) {
 }
 
 for (const marker of ['adminDataSourceRoute','injectAdminDataSourceUi','injectModalI18nHardening','injectThemeHardening','adminDataSourceEnv']) assert.ok(entry.includes(marker), marker);
-assert.match(entry, /path\.startsWith\('\/admin'\)/);
+assert.match(entry, /path\.startsWith\(["']\/admin["']\)/);
 console.log('premerge-hardening.test: PASS');
