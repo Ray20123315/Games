@@ -1,15 +1,19 @@
 import assert from 'node:assert/strict';
+import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import { injectThemeHardening } from '../src/ui/theme-hardening.js';
 import { injectThemeSurfaceFix } from '../src/ui/theme-surface-fix.js';
+import { injectSingleplayerBoardParity } from '../src/ui/singleplayer-board-parity.js';
 import { platformHomePage, playPortalPage, injectBoardLobbyPolish } from '../src/ui/platform-pages.js';
 import { botPage } from '../src/bot/page.js';
 import { injectVoiceSettingsAddon } from '../src/ui/room-voice-settings.js';
+function scripts(source){return [...String(source).matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)].map(m=>m[1]).filter(Boolean)}
 const home=platformHomePage(),portal=playPortalPage(),bot=botPage();
 for(const page of [home,portal,bot])assert.match(page,/© 2026 BoardVerse/);
 assert.match(home,/href="\/boards"/);assert.match(home,/href="\/cards"/);assert.match(home,/\/zh-tw/);assert.match(home,/\/zh-cn/);assert.match(home,/\/en-us/);
 assert.match(portal,/遊戲類型/);assert.match(bot,/電腦對戰 · 5 級難度/);assert.match(bot,/id="gameCatalog" open/);assert.match(bot,/bvSingleGameCatalogCollapsed/);assert.match(bot,/\/api\/singleplayer\/new/);assert.match(bot,/\/api\/singleplayer\/move/);
 for(const marker of ['圍棋 9×9','圍棋 13×13','圍棋 19×19','五子棋','連珠 Renju','象棋・隨機布局','暗棋（翻棋）','七國象棋','西洋棋','黑白棋 Reversi'])assert.ok(bot.includes(marker),marker);
+const singleBoard=injectSingleplayerBoardParity(bot);assert.match(singleBoard,/boardverse-singleplayer-board-parity-style/);assert.match(singleBoard,/boardverse-singleplayer-board-parity-script/);assert.match(singleBoard,/point-btn/);assert.match(singleBoard,/\(\(c\+\.5\)\/cols\*100\)/);assert.match(singleBoard,/makeSvg\(rows,cols,type\)/);assert.match(singleBoard,/楚 河/);assert.equal(injectSingleplayerBoardParity(singleBoard),singleBoard);for(const [i,script] of scripts(singleBoard).entries())new vm.Script(script,{filename:`singleplayer-${i}.js`});
 const theme=injectThemeHardening('<html><head></head><body></body></html>');
 for(const marker of ['bv-theme-slider','document.startViewTransition','prefers-reduced-motion','.line-board{--wood:#c99a50!important;--wood2:#b27f39!important}','--accent:#00f5ff','--accent2:#ff42f5'])assert.ok(theme.includes(marker),marker);
 const surface=injectThemeSurfaceFix('<html lang="en-US"><head></head><body></body></html>');
@@ -18,7 +22,7 @@ assert.match(surface,/b\.textContent!==next/);
 assert.doesNotMatch(surface,/\.line-board\{|#board\s*\{/);
 const board=injectBoardLobbyPolish('<html><head></head><body><div class="app-frame"><div class="game-catalog"><div class="game-catalog-head"></div><div id="gameList"></div></div></div></body></html>');assert.match(board,/bvGameCatalogToggle/);
 const voice=injectVoiceSettingsAddon('<html><body></body></html>');assert.match(voice,/voice\.disabled=!ok/);assert.match(voice,/body\.voiceEnabled=available\(\)/);
-const entry=await readFile(new URL('../src/index-v024.js',import.meta.url),'utf8');for(const marker of ['handlePlatformRoute','handleCardRoutes','handleSingleplayerRoutes','injectThemeSurfaceFix'])assert.ok(entry.includes(marker),marker);assert.match(entry,/if\(single\)return single/);assert.match(entry,/if\(platform\)return polish\(platform,path,env\)/);assert.match(entry,/if\(cards\)return polish\(cards,path,env\)/);assert.match(entry,/do_unavailable/);
+const entry=await readFile(new URL('../src/index-v024.js',import.meta.url),'utf8');for(const marker of ['handlePlatformRoute','handleCardRoutes','handleSingleplayerRoutes','injectThemeSurfaceFix','injectSingleplayerBoardParity'])assert.ok(entry.includes(marker),marker);assert.match(entry,/if\(single\)return single/);assert.match(entry,/if\(platform\)return polish\(platform,path,env\)/);assert.match(entry,/if\(cards\)return polish\(cards,path,env\)/);assert.match(entry,/path==="\/singleplayer"/);assert.match(entry,/do_unavailable/);
 const router=await readFile(new URL('../src/ui/platform-router.js',import.meta.url),'utf8');for(const marker of ['/home','/play','/boards','/singleplayer','/bot','/zh-tw','/zh-cn','/en-us','電腦對戰 · 5 級難度'])assert.ok(router.includes(marker),marker);assert.match(router,/replaceAll\('\/bot','\/singleplayer'\)/);
 const routes=await readFile(new URL('../src/cards/routes.js',import.meta.url),'utf8');for(const marker of ['/cards','/api/card-games','/api/card-rooms','ws\\/cards','listD1CardRooms','createD1CardRoom','readyD1CardRoom','actionD1CardRoom','isCardDoQuotaError'])assert.ok(routes.includes(marker),marker);
 const singleRoutes=await readFile(new URL('../src/bot/routes.js',import.meta.url),'utf8');for(const marker of ['/api/singleplayer/new','/api/singleplayer/move','newSingleplayerSession','playSingleplayerAction'])assert.ok(singleRoutes.includes(marker),marker);
