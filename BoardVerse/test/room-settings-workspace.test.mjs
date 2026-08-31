@@ -16,7 +16,7 @@ const ruleSelects = await readFile(new URL("../src/ui/room-rule-selects.js", imp
 const voiceSettings = await readFile(new URL("../src/ui/room-voice-settings.js", import.meta.url), "utf8");
 const wrangler = await readFile(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 
-assert.match(wrangler, /"main"\s*:\s*"src\/index-v024\.js"/);
+assert.match(wrangler, /"main"\s*:\s*"src\/index-v025\.js"/);
 assert.match(production, /from "\.\/index-v022\.js"/);
 for (const marker of [
   'SETTINGS_RE','/feature/room-settings','emergencyRoomSettings','injectRoomWorkspace','injectClockPresetAddon',
