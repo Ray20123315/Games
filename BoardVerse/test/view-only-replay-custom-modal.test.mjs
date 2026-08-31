@@ -5,6 +5,7 @@ import vm from "node:vm";
 const source = await readFile(new URL("../src/index-v016.js", import.meta.url), "utf8");
 const v015 = await readFile(new URL("../src/index-v015.js", import.meta.url), "utf8");
 const v014 = await readFile(new URL("../src/index-v014.js", import.meta.url), "utf8");
+const active = await readFile(new URL("../src/index-v025.js", import.meta.url), "utf8");
 const production = await readFile(new URL("../src/index-v023.js", import.meta.url), "utf8");
 const runtime = await readFile(new URL("../src/legacy/runtime-v029.js", import.meta.url), "utf8");
 const room = await readFile(new URL("../src/room/GameRoom.js", import.meta.url), "utf8");
@@ -58,7 +59,8 @@ assert.match(v014, /boardverse-unified-modal/);
 assert.match(v014, /window\.alert=function/);
 assert.match(v014, /window\.prompt=function/);
 assert.match(v014, /window\.confirm=function/);
-assert.match(wrangler, /"main": "src\/index-v024\.js"/);
+assert.match(wrangler, /"main": "src\/index-v025\.js"/);
+assert.match(active, /from "\.\/index-v024\.js"/);
 assert.match(production, /from "\.\/index-v022\.js"/);
 
 console.log("view-only-replay-custom-modal.test: PASS (readable admin replays + enhanced room replay player)");

@@ -26,7 +26,7 @@ jobs:
           node-version: "24"
       - name: Install dependencies
         run: npm install --ignore-scripts
-      - name: Scan stale active-entry assertions
-        run: grep -R -n --fixed-strings 'src/index-v024.js' test || true
+      - name: Scan v024 test references
+        run: grep -R -n 'index-v024' test || true
       - name: Run canonical BoardVerse validation
         run: node build-worker.mjs
