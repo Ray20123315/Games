@@ -38,6 +38,8 @@ assert.match(parity, /bvCardSafetyNote/);
 assert.match(parity, /pendingGame/);
 assert.match(parity, /applyPending/);
 assert.match(parity, /bvCardParityBound/);
+assert.match(parity, /localizedGameText/);
+assert.match(parity, /best five-card hand wins/);
 assert.match(parity, /Cancel ready/);
 assert.match(parity, /Playing-card faces are game content/);
 assert.equal(injectCardBoardParity(parity), parity, "card parity injection must be idempotent");
