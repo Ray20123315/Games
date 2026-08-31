@@ -13,6 +13,7 @@ const theme=injectThemeHardening('<html><head></head><body></body></html>');
 for(const marker of ['bv-theme-slider','document.startViewTransition','prefers-reduced-motion','.line-board{--wood:#c99a50!important;--wood2:#b27f39!important}','--accent:#00f5ff','--accent2:#ff42f5'])assert.ok(theme.includes(marker),marker);
 const surface=injectThemeSurfaceFix('<html lang="en-US"><head></head><body></body></html>');
 for(const marker of ['--p:#ffffff!important','--g:#00f5ff!important','Black','White','Sci-fi','#new.primary'])assert.ok(surface.includes(marker),marker);
+assert.match(surface,/b\.textContent!==next/);
 assert.doesNotMatch(surface,/\.line-board\{|#board\s*\{/);
 const board=injectBoardLobbyPolish('<html><head></head><body><div class="app-frame"><div class="game-catalog"><div class="game-catalog-head"></div><div id="gameList"></div></div></div></body></html>');assert.match(board,/bvGameCatalogToggle/);
 const voice=injectVoiceSettingsAddon('<html><body></body></html>');assert.match(voice,/voice\.disabled=!ok/);assert.match(voice,/body\.voiceEnabled=available\(\)/);
