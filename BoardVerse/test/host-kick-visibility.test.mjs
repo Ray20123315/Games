@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 
 const source = fs.readFileSync(new URL("../src/index-v013.js", import.meta.url), "utf8");
+const active = fs.readFileSync(new URL("../src/index-v025.js", import.meta.url), "utf8");
 const production = fs.readFileSync(new URL("../src/index-v023.js", import.meta.url), "utf8");
 const wrangler = fs.readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8");
 
@@ -24,7 +25,8 @@ test("OWNER account HTML masks the synthetic admin bridge email", () => {
   assert.match(source, /內部管理帳號/);
 });
 
-test("deployment wraps v022 with v023 urgent repair layer", () => {
-  assert.match(wrangler, /"main": "src\/index-v024\.js"/);
+test("deployment preserves the v023 urgent repair chain under v025", () => {
+  assert.match(wrangler, /"main": "src\/index-v025\.js"/);
+  assert.match(active, /from "\.\/index-v024\.js"/);
   assert.match(production, /from "\.\/index-v022\.js"/);
 });
