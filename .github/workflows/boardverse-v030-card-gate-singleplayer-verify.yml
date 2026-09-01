@@ -1,0 +1,36 @@
+name: BoardVerse v030 card gate singleplayer verify
+
+on:
+  push:
+    branches:
+      - boardverse-card-gate-singleplayer-v030
+    paths:
+      - "BoardVerse/**"
+      - ".github/workflows/boardverse-v030-card-gate-singleplayer-verify.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: BoardVerse
+    steps:
+      - name: Checkout v030 staging
+        uses: actions/checkout@v4
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Targeted v030 regression
+        run: |
+          node --check src/ui/page-parity-v029.js
+          node --check test/ui-bot-v029.test.mjs
+          node test/ui-bot-v029.test.mjs
+      - name: Canonical BoardVerse build gate
+        run: node build-worker.mjs
