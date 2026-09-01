@@ -1,0 +1,57 @@
+name: Temporary FTB Ultimine 26.2 Build
+
+on:
+  push:
+    branches:
+      - build-ftb-ultimine-26.2-20260901
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout FTB Ultimine 26.2 source
+        uses: actions/checkout@v4
+        with:
+          repository: Ray20123315/FTB-Ultimine
+          ref: main
+          path: ftb-ultimine
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Build FTB Ultimine
+        working-directory: ftb-ultimine
+        run: |
+          chmod +x gradlew
+          ./gradlew build --no-daemon --stacktrace
+
+      - name: Collect production JARs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          find ftb-ultimine/fabric/build/libs -maxdepth 1 -type f -name '*.jar' \
+            ! -name '*-sources.jar' ! -name '*-dev.jar' ! -name '*-javadoc.jar' \
+            -exec cp -v '{}' dist/ ';'
+          find ftb-ultimine/neoforge/build/libs -maxdepth 1 -type f -name '*.jar' \
+            ! -name '*-sources.jar' ! -name '*-dev.jar' ! -name '*-javadoc.jar' \
+            -exec cp -v '{}' dist/ ';'
+          test -n "$(find dist -maxdepth 1 -type f -name '*.jar' -print -quit)"
+          sha256sum dist/*.jar | tee dist/SHA256SUMS.txt
+          ls -lah dist
+
+      - name: Upload FTB Ultimine 26.2 JARs
+        uses: actions/upload-artifact@v4
+        with:
+          name: ftb-ultimine-26.2-jars
+          path: dist/*
+          if-no-files-found: error
+          retention-days: 7
