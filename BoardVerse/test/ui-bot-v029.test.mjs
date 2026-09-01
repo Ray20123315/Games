@@ -21,5 +21,5 @@ const settled={type:'go',size:3,board:['B','B','B','B',null,'B','B','B','B'],tur
 const capture={...afterPass,rules:{mode:'capture'}};assert.deepEqual(orderGoBotActions(capture,{side:'W'},[{r:4,c:4},{action:'pass'}],5),[{r:4,c:4},{action:'pass'}]);
 const session=await readFile(new URL('../src/bot/session-v029.js',import.meta.url),'utf8');for(const marker of ['orderGoBotActions','game?.type==="go"','{action:"pass"}'])assert.ok(session.includes(marker),marker);
 const routes=await readFile(new URL('../src/bot/routes.js',import.meta.url),'utf8');assert.match(routes,/from "\.\/session-v029\.js"/);
-const entry=await readFile(new URL('../src/index-v025.js',import.meta.url),'utf8');for(const marker of ['./ui/page-parity-v029.js','enhanceV029Html','x-boardverse-ui-hotfix","v029'])assert.ok(entry.includes(marker),marker);
+const entry=await readFile(new URL('../src/index-v025.js',import.meta.url),'utf8');for(const marker of ['./ui/page-parity-v029.js','enhanceV029Html','x-boardverse-ui-hotfix","v031'])assert.ok(entry.includes(marker),marker);
 console.log('ui-bot-v029.test: PASS');
