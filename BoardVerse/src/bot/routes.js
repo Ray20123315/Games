@@ -1,5 +1,5 @@
 import { json, errorJson } from "../core/http.js";
-import { newSingleplayerSession, playSingleplayerAction, singleplayerView } from "./session.js";
+import { newSingleplayerSession, playSingleplayerAction, singleplayerView } from "./session-v029.js";
 
 function bad(message,status=400,code="singleplayer_error"){return errorJson(message,status,code)}
 export async function handleSingleplayerRoutes(request){const u=new URL(request.url),p=u.pathname;if(request.method!=="POST")return null;if(p!=="/api/singleplayer/new"&&p!=="/api/singleplayer/move")return null;try{const body=await request.json().catch(()=>({}));if(p.endsWith("/new")){const session=await newSingleplayerSession(String(body.gameId||"gomoku"),body.level,body.rules||{});return json({ok:true,session,view:singleplayerView(session)})}if(!body.session||!body.action)return bad("缺少單人棋局狀態或走法。",400,"singleplayer_bad_request");const session=await playSingleplayerAction(body.session,body.action);return json({ok:true,session,view:singleplayerView(session)})}catch(e){return bad(e?.message||"單人棋局操作失敗。",400,e?.code||"singleplayer_move_failed")}}
