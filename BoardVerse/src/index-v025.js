@@ -5,7 +5,8 @@ import { enhanceV026Html } from "./ui/page-parity-v026.js";
 import { enhanceV028Html } from "./ui/page-parity-v028.js";
 import { fixV028UnoColorHtml } from "./ui/page-parity-v028-color-fix.js";
 import { enhanceV029Html } from "./ui/page-parity-v029.js";
+import { enhanceCardRulesV031 } from "./ui/card-rules-v031.js";
 export * from "./index-v024.js";
 function normalizeV025(body){return String(body||"").replace("levels:['','入門','简单','普通','困难','专家']","levels:['','入门','简单','普通','困难','专家']")}
-async function polish(response,path){if(!String(response?.headers?.get("content-type")||"").includes("text/html"))return response;const base=normalizeV025(enhanceV025Html(await response.text(),path)),v026=enhanceV026Html(base,path),v028=enhanceV028Html(v026,path,APP_VERSION),color=fixV028UnoColorHtml(v028,path),body=enhanceV029Html(color,path);const headers=new Headers(response.headers);headers.delete("content-length");headers.set("cache-control","no-store");headers.set("x-boardverse-ui-hotfix","v029");return new Response(body,{status:response.status,statusText:response.statusText,headers})}
+async function polish(response,path){if(!String(response?.headers?.get("content-type")||"").includes("text/html"))return response;const base=normalizeV025(enhanceV025Html(await response.text(),path)),v026=enhanceV026Html(base,path),v028=enhanceV028Html(v026,path,APP_VERSION),color=fixV028UnoColorHtml(v028,path),v029=enhanceV029Html(color,path),body=enhanceCardRulesV031(v029,path);const headers=new Headers(response.headers);headers.delete("content-length");headers.set("cache-control","no-store");headers.set("x-boardverse-ui-hotfix","v031");return new Response(body,{status:response.status,statusText:response.statusText,headers})}
 export default{async fetch(req,env,ctx){const path=new URL(req.url).pathname;return polish(await appV024.fetch(req,env,ctx),path)},scheduled(e,env,ctx){return appV024.scheduled(e,env,ctx)}};
