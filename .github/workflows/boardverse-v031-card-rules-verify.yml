@@ -1,0 +1,37 @@
+name: BoardVerse v031 card rules verify
+
+on:
+  push:
+    branches:
+      - boardverse-card-win-rules-v031
+    paths:
+      - "BoardVerse/**"
+      - ".github/workflows/boardverse-v031-card-rules-verify.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: BoardVerse
+    steps:
+      - name: Checkout v031 staging
+        uses: actions/checkout@v4
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Targeted v031 regression
+        run: |
+          node --check src/ui/card-rules-v031.js
+          node --check test/card-rules-v031.test.mjs
+          node --check src/index-v025.js
+          node test/card-rules-v031.test.mjs
+      - name: Canonical BoardVerse build gate
+        run: node build-worker.mjs
