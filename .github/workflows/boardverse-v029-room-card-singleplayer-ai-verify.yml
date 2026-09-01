@@ -1,0 +1,39 @@
+name: BoardVerse v029 room card singleplayer AI verify
+
+on:
+  push:
+    branches:
+      - boardverse-room-card-singleplayer-ai-v029
+    paths:
+      - "BoardVerse/**"
+      - ".github/workflows/boardverse-v029-room-card-singleplayer-ai-verify.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: BoardVerse
+    steps:
+      - name: Checkout v029 staging
+        uses: actions/checkout@v4
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Targeted v029 syntax and regression
+        run: |
+          node --check src/ui/page-parity-v029.js
+          node --check src/bot/go-policy.js
+          node --check src/bot/session-v029.js
+          node --check src/bot/routes.js
+          node --check src/index-v025.js
+          node test/ui-bot-v029.test.mjs
+      - name: Canonical BoardVerse build gate
+        run: node build-worker.mjs
