@@ -27,13 +27,16 @@ jobs:
           ref: 5c8dd7da8dd6c6ffae9308dd87570c423b2ca291
           path: deps/ftb-library
 
-      - name: Publish FTB Library 26.2 snapshot to Maven Local
+      - name: Publish FTB Library 26.2 to Maven Local
         working-directory: deps/ftb-library
         run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "5c8dd7da8dd6c6ffae9308dd87570c423b2ca291"
           chmod +x gradlew
           ./gradlew publishToMavenLocal --no-daemon --stacktrace
-          test -d "$HOME/.m2/repository/dev/ftb/mods/ftb-library/26.2.0.8-SNAPSHOT"
-          find "$HOME/.m2/repository/dev/ftb/mods" -maxdepth 4 -type f -path '*26.2.0.8-SNAPSHOT*' -print | sort
+          test -d "$HOME/.m2/repository/dev/ftb/mods/ftb-library/26.2.0.8"
+          test -d "$HOME/.m2/repository/dev/ftb/mods/ftb-library-fabric/26.2.0.8"
+          test -d "$HOME/.m2/repository/dev/ftb/mods/ftb-library-neoforge/26.2.0.8"
 
       - name: Checkout FTB Ranks 26.2 port
         uses: actions/checkout@v4
@@ -42,13 +45,16 @@ jobs:
           ref: 95d5bf74df289f2824f1531cd48b2737235d5b0c
           path: deps/ftb-ranks
 
-      - name: Publish FTB Ranks 26.2 snapshot to Maven Local
+      - name: Publish FTB Ranks 26.2 to Maven Local
         working-directory: deps/ftb-ranks
         run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "95d5bf74df289f2824f1531cd48b2737235d5b0c"
           chmod +x gradlew
-          ./gradlew publishToMavenLocal --no-daemon --stacktrace
-          test -d "$HOME/.m2/repository/dev/ftb/mods/ftb-ranks/26.2.0.3-SNAPSHOT"
-          find "$HOME/.m2/repository/dev/ftb/mods" -maxdepth 4 -type f -path '*26.2.0.3-SNAPSHOT*' -print | sort
+          ./gradlew publishToMavenLocal --no-daemon --stacktrace -Pftb_library_version=26.2.0.8
+          test -d "$HOME/.m2/repository/dev/ftb/mods/ftb-ranks/26.2.0.3"
+          test -d "$HOME/.m2/repository/dev/ftb/mods/ftb-ranks-fabric/26.2.0.3"
+          test -d "$HOME/.m2/repository/dev/ftb/mods/ftb-ranks-neoforge/26.2.0.3"
 
       - name: Checkout FTB Ultimine 26.2 source
         uses: actions/checkout@v4
@@ -60,8 +66,12 @@ jobs:
       - name: Build FTB Ultimine
         working-directory: ftb-ultimine
         run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "74506b78901581b962d6f503d612235df06c0b1c"
           chmod +x gradlew
-          ./gradlew build --no-daemon --stacktrace
+          ./gradlew build --no-daemon --stacktrace \
+            -Pftb_library_version=26.2.0.8 \
+            -Pftb_ranks_version=26.2.0.3
 
       - name: Collect production JARs
         shell: bash
@@ -74,8 +84,12 @@ jobs:
           find ftb-ultimine/neoforge/build/libs -maxdepth 1 -type f -name '*.jar' \
             ! -name '*-sources.jar' ! -name '*-dev.jar' ! -name '*-javadoc.jar' \
             -exec cp -v '{}' dist/ ';'
-          test -n "$(find dist -maxdepth 1 -type f -name '*.jar' -print -quit)"
+          test "$(find dist -maxdepth 1 -type f -name '*.jar' | wc -l)" -ge 2
           sha256sum dist/*.jar | tee dist/SHA256SUMS.txt
+          printf 'Ultimine source: %s\nLibrary source: %s\nRanks source: %s\n' \
+            '74506b78901581b962d6f503d612235df06c0b1c' \
+            '5c8dd7da8dd6c6ffae9308dd87570c423b2ca291' \
+            '95d5bf74df289f2824f1531cd48b2737235d5b0c' > dist/BUILD-SOURCES.txt
           ls -lah dist
 
       - name: Upload FTB Ultimine 26.2 JARs
