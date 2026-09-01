@@ -12,20 +12,50 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
-      - name: Checkout FTB Ultimine 26.2 source
-        uses: actions/checkout@v4
-        with:
-          repository: Ray20123315/FTB-Ultimine
-          ref: main
-          path: ftb-ultimine
-
       - name: Set up Java 25
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '25'
+
+      - name: Checkout FTB Library 26.2 port
+        uses: actions/checkout@v4
+        with:
+          repository: Officialy/FTB-Library
+          ref: 5c8dd7da8dd6c6ffae9308dd87570c423b2ca291
+          path: deps/ftb-library
+
+      - name: Publish FTB Library 26.2 snapshot to Maven Local
+        working-directory: deps/ftb-library
+        run: |
+          chmod +x gradlew
+          ./gradlew publishToMavenLocal --no-daemon --stacktrace
+          test -d "$HOME/.m2/repository/dev/ftb/mods/ftb-library/26.2.0.8-SNAPSHOT"
+          find "$HOME/.m2/repository/dev/ftb/mods" -maxdepth 4 -type f -path '*26.2.0.8-SNAPSHOT*' -print | sort
+
+      - name: Checkout FTB Ranks 26.2 port
+        uses: actions/checkout@v4
+        with:
+          repository: Officialy/FTB-Ranks
+          ref: 95d5bf74df289f2824f1531cd48b2737235d5b0c
+          path: deps/ftb-ranks
+
+      - name: Publish FTB Ranks 26.2 snapshot to Maven Local
+        working-directory: deps/ftb-ranks
+        run: |
+          chmod +x gradlew
+          ./gradlew publishToMavenLocal --no-daemon --stacktrace
+          test -d "$HOME/.m2/repository/dev/ftb/mods/ftb-ranks/26.2.0.3-SNAPSHOT"
+          find "$HOME/.m2/repository/dev/ftb/mods" -maxdepth 4 -type f -path '*26.2.0.3-SNAPSHOT*' -print | sort
+
+      - name: Checkout FTB Ultimine 26.2 source
+        uses: actions/checkout@v4
+        with:
+          repository: Ray20123315/FTB-Ultimine
+          ref: 74506b78901581b962d6f503d612235df06c0b1c
+          path: ftb-ultimine
 
       - name: Build FTB Ultimine
         working-directory: ftb-ultimine
